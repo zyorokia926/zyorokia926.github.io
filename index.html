@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>スイス全国鉄道路線図</title>
+<style>
+:root{
+  --bg:#f7f6f3;
+  --panel-bg:#ffffff;
+  --panel-border:#dedad2;
+  --text:#1d1d1b;
+  --text-dim:#6b6a66;
+  --accent:#eb0000;
+  --track-main:#c8102e;
+  --track-regional:#2e7d32;
+  --track-sbahn:#1565c0;
+  --track-mountain:#e65100;
+  --station-major:#1d1d1b;
+  --station-minor:#5a5955;
+  --shadow:0 2px 10px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#161513;
+    --panel-bg:#211f1c;
+    --panel-border:#3a3733;
+    --text:#f3f1ec;
+    --text-dim:#a6a29a;
+    --station-major:#f3f1ec;
+    --station-minor:#c9c5bc;
+    --shadow:0 2px 14px rgba(0,0,0,.5);
+  }
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;background:var(--bg);}
+body{
+  font-family:"Helvetica Neue",Helvetica,Arial,"Hiragino Sans","Noto Sans JP",sans-serif;
+  color:var(--text);
+  overflow:hidden;
+}
+#app{position:fixed;inset:0;display:flex;flex-direction:column;}
+
+/* ---------- toolbar ---------- */
+#toolbar{
+  flex:0 0 auto;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  padding:10px 12px 8px;
+  background:var(--bg);
+  border-bottom:1px solid var(--panel-border);
+  z-index:30;
+}
+#searchRow{display:flex;gap:8px;position:relative;}
+#searchInput{
+  flex:1 1 auto;
+  min-width:0;
+  font-size:16px;
+  padding:10px 12px;
+  border:1.5px solid var(--panel-border);
+  border-radius:6px;
+  background:var(--panel-bg);
+  color:var(--text);
+}
+#searchInput:focus{outline:2px solid var(--accent);outline-offset:1px;}
+#searchBtn{
+  flex:0 0 auto;
+  font-size:15px;
+  padding:10px 16px;
+  border:none;
+  border-radius:6px;
+  background:var(--accent);
+  color:#fff;
+  cursor:pointer;
+  font-weight:600;
+}
+#searchBtn:active{opacity:.85;}
+#suggestions{
+  position:absolute;
+  top:calc(100% + 4px);
+  left:0;
+  right:64px;
+  background:var(--panel-bg);
+  border:1px solid var(--panel-border);
+  border-radius:6px;
+  box-shadow:var(--shadow);
+  max-height:340px;
+  overflow-y:auto;
+  z-index:40;
+  display:none;
+}
+#suggestions.show{display:block;}
+.sugg-item{
+  padding:8px 12px;
+  cursor:pointer;
+  border-bottom:1px solid var(--panel-border);
+  display:flex;
+  flex-direction:column;
+  gap:1px;
+}
+.sugg-item:last-child{border-bottom:none;}
+.sugg-item:hover,.sugg-item.active{background:rgba(235,0,0,.08);}
+.sugg-local{font-weight:600;font-size:14px;}
+.sugg-ja{font-size:12.5px;color:var(--text-dim);}
+.sugg-region{font-size:11px;color:var(--text-dim);}
+.sugg-empty{padding:10px 12px;color:var(--text-dim);font-size:13.5px;}
+
+#regionTabs{
+  display:flex;
+  gap:6px;
+  overflow-x:auto;
+  padding-bottom:2px;
+  -webkit-overflow-scrolling:touch;
+}
+#regionTabs::-webkit-scrollbar{height:4px;}
+.region-btn{
+  flex:0 0 auto;
+  font-size:12.5px;
+  padding:6px 11px;
+  border-radius:16px;
+  border:1.3px solid var(--panel-border);
+  background:var(--panel-bg);
+  color:var(--text);
+  cursor:pointer;
+  white-space:nowrap;
+}
+.region-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
+
+/* ---------- map area ---------- */
+#mapWrap{flex:1 1 auto;position:relative;min-height:0;}
+#map{width:100%;height:100%;display:block;touch-action:none;cursor:grab;background:transparent;}
+#map.dragging{cursor:grabbing;}
+
+text{font-family:"Helvetica Neue",Helvetica,Arial,"Hiragino Sans","Noto Sans JP",sans-serif;user-select:none;}
+.label-local{font-size:9.5px;font-weight:700;fill:var(--text);}
+.label-ja{font-size:8px;fill:var(--text-dim);}
+.label-group{cursor:pointer;}
+.leader{stroke:var(--text-dim);stroke-width:.5;opacity:.55;}
+
+.station-dot{cursor:pointer;stroke:var(--bg);stroke-width:1;}
+.station-dot.major{fill:var(--station-major);}
+.station-dot.minor{fill:var(--station-minor);}
+.station-dot.mountain{fill:var(--track-mountain);}
+.station-dot:hover{stroke:var(--accent);stroke-width:2;}
+
+.track{fill:none;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke;}
+.track-casing{fill:none;stroke:var(--bg);stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke;}
+/* 路線種別ごとに「色」だけでなく「線の模様」も変えることで、他の路線や文字と重なっても判別できるようにする */
+.track.mainline{stroke:var(--track-main);stroke-width:4.6;}                              /* 実線・太め = 主要鉄道 */
+.track.regional{stroke:var(--track-regional);stroke-width:3.6;stroke-dasharray:11 6;}    /* 破線 = 地方鉄道 */
+.track.sbahn{stroke:var(--track-sbahn);stroke-width:4;stroke-dasharray:.1 8;stroke-linecap:round;} /* 丸ドット = S-Bahn */
+.track.mountain{stroke:var(--track-mountain);stroke-width:3.6;stroke-dasharray:10 3 2 3;} /* 一点鎖線 = 山岳鉄道 */
+.track.rack{stroke-dasharray:none;}
+.rack-tick{fill:none;stroke-linecap:butt;vector-effect:non-scaling-stroke;pointer-events:none;}
+.rack-tick.tick-a{stroke:#000;stroke-width:5.2;stroke-dasharray:2.6 6.6;}
+.rack-tick.tick-b{stroke:#fff;stroke-width:5.2;stroke-dasharray:2.6 6.6;stroke-dashoffset:4.6;}
+.track.scenic-overlay{stroke:#7b1fa2;stroke-width:1.8;stroke-dasharray:.1 5.5;stroke-linecap:round;opacity:.9;pointer-events:none;}
+/* ラベル文字に背景色のフチ（ハロー）を付け、線や他の文字と重なっても読めるようにする */
+.label-local,.label-ja{
+  paint-order:stroke fill;
+  stroke:var(--bg);
+  stroke-width:3.2px;
+  stroke-linejoin:round;
+}
+
+.geo-lake{fill:#8fb4c9;opacity:.16;stroke:none;}
+.geo-mtn{fill:none;stroke:var(--text-dim);stroke-width:.6;opacity:.18;}
+.geo-city-halo{fill:var(--text-dim);opacity:.06;}
+.border-arrow-text{font-size:7.5px;fill:var(--text-dim);font-style:italic;}
+
+#highlightLayer circle{fill:none;stroke:var(--accent);stroke-width:2;}
+.pulse{animation:pulse 1.4s ease-out infinite;}
+@keyframes pulse{
+  0%{r:6;opacity:.9;}
+  100%{r:22;opacity:0;}
+}
+
+/* ---------- floating panels ---------- */
+.floating-panel{
+  position:absolute;
+  background:var(--panel-bg);
+  border:1px solid var(--panel-border);
+  border-radius:8px;
+  box-shadow:var(--shadow);
+  font-size:12.5px;
+  color:var(--text);
+}
+#legend{
+  top:10px;
+  right:10px;
+  padding:8px 12px;
+  max-width:150px;
+  line-height:1.6;
+}
+.legend-row{display:flex;align-items:center;gap:6px;margin-bottom:3px;}
+.legend-swatch{width:18px;height:3px;border-radius:2px;flex:0 0 auto;}
+.legend-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;}
+
+#layerToggle{
+  top:10px;
+  left:10px;
+  padding:8px 10px;
+}
+details.floating-panel summary{cursor:pointer;font-weight:600;font-size:12.5px;list-style:none;}
+details.floating-panel summary::-webkit-details-marker{display:none;}
+details.floating-panel[open] summary::after{content:" ▲";}
+details.floating-panel:not([open]) summary::after{content:" ▼";}
+#legend summary{margin:0;}
+#legend[open] #legendRows{margin-top:8px;}
+.layer-row{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;}
+.layer-row label{cursor:pointer;}
+
+#infoPanel{
+  bottom:10px;
+  left:10px;
+  right:10px;
+  max-width:340px;
+  padding:14px 16px;
+  display:none;
+}
+#infoPanel.show{display:block;}
+#infoPanel h3{margin:0 0 2px;font-size:16px;}
+#infoPanel .ja-name{color:var(--text-dim);font-size:13px;margin-bottom:8px;}
+#infoPanel .info-row{font-size:12.5px;margin:4px 0;}
+#infoPanel .info-label{color:var(--text-dim);}
+#infoPanel .lines-list{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}
+.line-chip{font-size:10.5px;padding:2px 7px;border-radius:10px;color:#fff;}
+#infoPanel .btn-row{margin-top:10px;display:flex;gap:8px;}
+#infoPanel button{
+  font-size:12.5px;
+  padding:6px 10px;
+  border-radius:5px;
+  border:1px solid var(--panel-border);
+  background:var(--bg);
+  color:var(--text);
+  cursor:pointer;
+}
+#infoPanel button.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+#closeInfo{position:absolute;top:6px;right:8px;background:none;border:none;font-size:16px;color:var(--text-dim);cursor:pointer;padding:4px;}
+
+#toast{
+  position:absolute;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  background:var(--panel-bg);
+  border:1px solid var(--panel-border);
+  border-radius:8px;
+  padding:10px 18px;
+  font-size:13.5px;
+  box-shadow:var(--shadow);
+  display:none;
+  z-index:50;
+}
+#toast.show{display:block;}
+
+#zoomCtrl{
+  position:absolute;
+  bottom:10px;
+  right:10px;
+  display:flex;
+  flex-direction:column;
+  gap:1px;
+}
+#zoomCtrl button{
+  width:34px;height:34px;
+  font-size:18px;
+  border:1px solid var(--panel-border);
+  background:var(--panel-bg);
+  color:var(--text);
+  cursor:pointer;
+}
+#zoomCtrl button:first-child{border-radius:8px 8px 0 0;}
+#zoomCtrl button:last-child{border-radius:0 0 8px 8px;}
+
+@media (max-width:640px){
+  #legend{max-width:120px;font-size:11px;padding:7px 9px;}
+  #infoPanel{right:10px;left:10px;max-width:none;}
+  .label-local{font-size:11px;}
+  .label-ja{font-size:9.5px;}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="toolbar">
+    <div id="searchRow">
+      <input id="searchInput" type="text" placeholder="駅名を検索（日本語 / 現地語） 例: チューリッヒ, Zermatt" autocomplete="off">
+      <button id="searchBtn">検索</button>
+      <div id="suggestions"></div>
+    </div>
+    <div id="regionTabs"></div>
+  </div>
+
+  <div id="mapWrap">
+    <svg id="map" viewBox="0 0 1700 1300" preserveAspectRatio="xMidYMid meet">
+      <g id="geoLayer"></g>
+      <g id="lineLayer"></g>
+      <g id="stationLayer"></g>
+      <g id="labelLayer"></g>
+      <g id="highlightLayer"></g>
+    </svg>
+
+    <details id="layerToggle" class="floating-panel" open>
+      <summary>表示レイヤー</summary>
+      <div id="layerRows"></div>
+    </details>
+
+    <details id="legend" class="floating-panel" open>
+      <summary>凡例</summary>
+      <div id="legendRows"></div>
+    </details>
+
+    <div id="zoomCtrl">
+      <button id="zoomIn" aria-label="拡大">＋</button>
+      <button id="zoomOut" aria-label="縮小">－</button>
+    </div>
+
+    <div id="infoPanel" class="floating-panel">
+      <button id="closeInfo">✕</button>
+      <h3 id="infoLocal"></h3>
+      <div class="ja-name" id="infoJa"></div>
+      <div class="info-row"><span class="info-label">地域: </span><span id="infoRegion"></span></div>
+      <div class="info-row"><span class="info-label">駅種別: </span><span id="infoType"></span></div>
+      <div class="info-row"><span class="info-label">接続路線:</span>
+        <div class="lines-list" id="infoLines"></div>
+      </div>
+      <div class="btn-row">
+        <button class="primary" id="btnFocus">この駅へ移動</button>
+        <button id="btnZoomAround">周辺を拡大</button>
+      </div>
+    </div>
+
+    <div id="toast"></div>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   データ定義
+   注: 主要駅・主要路線を中心に、山岳鉄道・私鉄・S-Bahn・観光路線を
+   できる限り広く収録した「厳選データセット」です（スイス全駅の完全収録では
+   ありません）。座標は概略値です。ご利用前に SBB 公式サイト等で最新情報を
+   ご確認ください。
+   ========================================================================= */
+
+// 投影用パラメータ
+// F=2: 駅間の間隔を2倍に広げ、ラベルが重なりにくくしています（地図全体のスケールを拡大）
+const PROJ = { lng0:5.9, lat0:47.9, latRef:46.8, scale:580, ox:80, oy:80 };
+function project(lat,lng){
+  const cosLat = Math.cos(PROJ.latRef*Math.PI/180);
+  const x = PROJ.ox + (lng - PROJ.lng0) * PROJ.scale * cosLat;
+  const y = PROJ.oy + (PROJ.lat0 - lat) * PROJ.scale;
+  return {x,y};
+}
+
+const REGIONS = [
+  {id:"all",       name:"全体",                 box:[0,0,1700,1300]},
+  {id:"zurich",     name:"チューリッヒ・北東部",  box:[940,20,720,540]},
+  {id:"basel",      name:"バーゼル・北西部",      box:[580,20,580,420]},
+  {id:"bern",       name:"ベルン・中央部",        box:[240,220,680,460]},
+  {id:"luzern",     name:"ルツェルン・中央スイス", box:[640,260,540,460]},
+  {id:"geneva",     name:"ジュネーブ・西部",      box:[20,580,700,540]},
+  {id:"valais",     name:"ヴァレー・アルプス地域", box:[480,640,780,580]},
+  {id:"oberland",   name:"ベルナーオーバーラント", box:[640,420,620,500]},
+  {id:"graubunden", name:"グラウビュンデン・南東部",box:[1100,280,580,740]},
+  {id:"ticino",     name:"ティチーノ・南部",      box:[740,840,600,440]},
+];
+
+// 駅データ: id, name(現地語), ja(日本語), lat, lng, region, type(major/minor/mountain)
+// labelDir: 'n','s','e','w' のいずれか（密集地の重なり回避用の初期値）
+const STATIONS = [
+// --- チューリッヒ・北東部 ---
+{id:"zurich_hb",name:"Zürich HB",ja:"チューリッヒ中央駅",lat:47.3782,lng:8.5402,region:"zurich",type:"major",labelDir:"w"},
+{id:"zurich_flughafen",name:"Zürich Flughafen",ja:"チューリッヒ空港駅",lat:47.4502,lng:8.5624,region:"zurich",type:"minor",labelDir:"n"},
+{id:"zurich_stadelhofen",name:"Zürich Stadelhofen",ja:"チューリッヒ・シュタデルホーフェン",lat:47.3667,lng:8.5486,region:"zurich",type:"minor",labelDir:"e"},
+{id:"zurich_oerlikon",name:"Zürich Oerlikon",ja:"チューリッヒ・エルリコン",lat:47.4111,lng:8.5442,region:"zurich",type:"minor",labelDir:"e"},
+{id:"zurich_hardbruecke",name:"Zürich Hardbrücke",ja:"チューリッヒ・ハルトブリュッケ",lat:47.3853,lng:8.5172,region:"zurich",type:"minor",labelDir:"w"},
+{id:"zurich_enge",name:"Zürich Enge",ja:"チューリッヒ・エンゲ",lat:47.3644,lng:8.5314,region:"zurich",type:"minor",labelDir:"s"},
+{id:"winterthur",name:"Winterthur",ja:"ヴィンタートゥール",lat:47.4996,lng:8.7241,region:"zurich",type:"major",labelDir:"n"},
+{id:"rapperswil",name:"Rapperswil",ja:"ラッパースヴィル",lat:47.2264,lng:8.8188,region:"zurich",type:"minor",labelDir:"s"},
+{id:"uster",name:"Uster",ja:"ウスター",lat:47.3486,lng:8.7211,region:"zurich",type:"minor",labelDir:"n"},
+{id:"baden",name:"Baden",ja:"バーデン",lat:47.4761,lng:8.3067,region:"zurich",type:"minor",labelDir:"w"},
+{id:"buelach",name:"Bülach",ja:"ビュラハ",lat:47.5225,lng:8.5361,region:"zurich",type:"minor",labelDir:"n"},
+{id:"schaffhausen",name:"Schaffhausen",ja:"シャフハウゼン",lat:47.6969,lng:8.6304,region:"zurich",type:"minor",labelDir:"n"},
+{id:"frauenfeld",name:"Frauenfeld",ja:"フラウエンフェルト",lat:47.5556,lng:8.8981,region:"zurich",type:"minor",labelDir:"n"},
+{id:"wil",name:"Wil",ja:"ヴィール",lat:47.4636,lng:9.0447,region:"zurich",type:"minor",labelDir:"s"},
+{id:"st_gallen",name:"St. Gallen",ja:"ザンクト・ガレン",lat:47.4239,lng:9.3697,region:"zurich",type:"major",labelDir:"n"},
+{id:"rorschach",name:"Rorschach",ja:"ロールシャッハ",lat:47.4794,lng:9.4919,region:"zurich",type:"minor",labelDir:"e"},
+{id:"romanshorn",name:"Romanshorn",ja:"ロマンスホルン",lat:47.5661,lng:9.3789,region:"zurich",type:"minor",labelDir:"n"},
+{id:"kreuzlingen",name:"Kreuzlingen",ja:"クロイツリンゲン",lat:47.6469,lng:9.1758,region:"zurich",type:"minor",labelDir:"n"},
+
+// --- バーゼル・北西部 ---
+{id:"basel_sbb",name:"Basel SBB",ja:"バーゼル駅（SBB）",lat:47.5476,lng:7.5896,region:"basel",type:"major",labelDir:"w"},
+{id:"basel_bad",name:"Basel Bad. Bahnhof",ja:"バーゼル・バーディッシャー駅",lat:47.5672,lng:7.5975,region:"basel",type:"minor",labelDir:"n"},
+{id:"liestal",name:"Liestal",ja:"リースタル",lat:47.4842,lng:7.7350,region:"basel",type:"minor",labelDir:"e"},
+{id:"delemont",name:"Delémont",ja:"ドゥレモン",lat:47.3644,lng:7.3444,region:"basel",type:"minor",labelDir:"w"},
+{id:"solothurn",name:"Solothurn",ja:"ゾロトゥルン",lat:47.2088,lng:7.5323,region:"basel",type:"minor",labelDir:"s"},
+{id:"olten",name:"Olten",ja:"オルテン",lat:47.3500,lng:7.9042,region:"basel",type:"major",labelDir:"s"},
+{id:"aarau",name:"Aarau",ja:"アーラウ",lat:47.3925,lng:8.0442,region:"basel",type:"minor",labelDir:"e"},
+{id:"brugg",name:"Brugg",ja:"ブルック",lat:47.4806,lng:8.2072,region:"basel",type:"minor",labelDir:"n"},
+{id:"rheinfelden",name:"Rheinfelden",ja:"ラインフェルデン",lat:47.5539,lng:7.7936,region:"basel",type:"minor",labelDir:"n"},
+
+// --- ベルン・中央部 ---
+{id:"bern",name:"Bern",ja:"ベルン",lat:46.9489,lng:7.4386,region:"bern",type:"major",labelDir:"w"},
+{id:"biel",name:"Biel/Bienne",ja:"ビール/ビエンヌ",lat:47.1368,lng:7.2464,region:"bern",type:"minor",labelDir:"n"},
+{id:"fribourg",name:"Fribourg",ja:"フリブール",lat:46.8033,lng:7.1517,region:"bern",type:"minor",labelDir:"s"},
+{id:"neuchatel",name:"Neuchâtel",ja:"ヌーシャテル",lat:46.9910,lng:6.9376,region:"bern",type:"minor",labelDir:"w"},
+{id:"chaux_de_fonds",name:"La Chaux-de-Fonds",ja:"ラ・ショー・ド・フォン",lat:47.1000,lng:6.8253,region:"bern",type:"minor",labelDir:"n"},
+{id:"thun",name:"Thun",ja:"トゥーン",lat:46.7580,lng:7.6280,region:"bern",type:"minor",labelDir:"e"},
+{id:"burgdorf",name:"Burgdorf",ja:"ブルクドルフ",lat:47.0594,lng:7.6231,region:"bern",type:"minor",labelDir:"n"},
+{id:"langnau",name:"Langnau i.E.",ja:"ランナウ",lat:46.9394,lng:7.7864,region:"bern",type:"minor",labelDir:"s"},
+{id:"murten",name:"Murten",ja:"ムルテン",lat:46.9267,lng:7.1197,region:"bern",type:"minor",labelDir:"w"},
+{id:"yverdon",name:"Yverdon-les-Bains",ja:"イヴェルドン・レ・バン",lat:46.7785,lng:6.6412,region:"bern",type:"minor",labelDir:"s"},
+
+// --- ルツェルン・中央スイス ---
+{id:"luzern",name:"Luzern",ja:"ルツェルン",lat:47.0502,lng:8.3093,region:"luzern",type:"major",labelDir:"w"},
+{id:"zug",name:"Zug",ja:"ツーク",lat:47.1725,lng:8.5150,region:"luzern",type:"minor",labelDir:"n"},
+{id:"arth_goldau",name:"Arth-Goldau",ja:"アルト・ゴルダウ",lat:47.0492,lng:8.5498,region:"luzern",type:"minor",labelDir:"e"},
+{id:"schwyz",name:"Schwyz",ja:"シュヴィーツ",lat:47.0208,lng:8.6535,region:"luzern",type:"minor",labelDir:"s"},
+{id:"kuessnacht",name:"Küssnacht am Rigi",ja:"キュスナハト",lat:47.0833,lng:8.4333,region:"luzern",type:"minor",labelDir:"n"},
+{id:"vitznau",name:"Vitznau",ja:"フィッツナウ",lat:47.0058,lng:8.4839,region:"luzern",type:"mountain",labelDir:"s"},
+{id:"rigi_kulm",name:"Rigi Kulm",ja:"リギ・クルム",lat:47.0578,lng:8.4881,region:"luzern",type:"mountain",labelDir:"n"},
+{id:"engelberg",name:"Engelberg",ja:"エンゲルベルク",lat:46.8236,lng:8.4083,region:"luzern",type:"mountain",labelDir:"s"},
+{id:"sarnen",name:"Sarnen",ja:"サルネン",lat:46.8975,lng:8.2453,region:"luzern",type:"minor",labelDir:"w"},
+{id:"stans",name:"Stans",ja:"スタンス",lat:46.9583,lng:8.3667,region:"luzern",type:"minor",labelDir:"e"},
+{id:"hergiswil",name:"Hergiswil",ja:"ヘルギスヴィル",lat:46.9928,lng:8.3086,region:"luzern",type:"minor",labelDir:"w"},
+{id:"giswil",name:"Giswil",ja:"ギスヴィル",lat:46.8306,lng:8.1667,region:"luzern",type:"minor",labelDir:"s"},
+
+// --- ジュネーブ・西部 ---
+{id:"geneve",name:"Genève",ja:"ジュネーブ",lat:46.2100,lng:6.1425,region:"geneva",type:"major",labelDir:"w"},
+{id:"geneve_aeroport",name:"Genève Aéroport",ja:"ジュネーブ空港駅",lat:46.2381,lng:6.1089,region:"geneva",type:"minor",labelDir:"n"},
+{id:"nyon",name:"Nyon",ja:"ニヨン",lat:46.3833,lng:6.2333,region:"geneva",type:"minor",labelDir:"w"},
+{id:"lausanne",name:"Lausanne",ja:"ローザンヌ",lat:46.5167,lng:6.6292,region:"geneva",type:"major",labelDir:"n"},
+{id:"vevey",name:"Vevey",ja:"ヴヴェイ",lat:46.4600,lng:6.8419,region:"geneva",type:"minor",labelDir:"e"},
+{id:"montreux",name:"Montreux",ja:"モントルー",lat:46.4312,lng:6.9107,region:"geneva",type:"minor",labelDir:"e"},
+{id:"morges",name:"Morges",ja:"モルジュ",lat:46.5117,lng:6.4983,region:"geneva",type:"minor",labelDir:"w"},
+{id:"rolle",name:"Rolle",ja:"ロール",lat:46.4581,lng:6.3400,region:"geneva",type:"minor",labelDir:"s"},
+
+// --- ヴァレー・アルプス地域 ---
+{id:"sion",name:"Sion",ja:"シオン",lat:46.2333,lng:7.3667,region:"valais",type:"major",labelDir:"n"},
+{id:"sierre",name:"Sierre",ja:"シエール",lat:46.2925,lng:7.5350,region:"valais",type:"minor",labelDir:"n"},
+{id:"visp",name:"Visp",ja:"フィスプ",lat:46.2937,lng:7.8813,region:"valais",type:"minor",labelDir:"n"},
+{id:"brig",name:"Brig",ja:"ブリーク",lat:46.3167,lng:7.9833,region:"valais",type:"major",labelDir:"n"},
+{id:"zermatt",name:"Zermatt",ja:"ツェルマット",lat:46.0207,lng:7.7491,region:"valais",type:"mountain",labelDir:"s"},
+{id:"taesch",name:"Täsch",ja:"テッシュ",lat:46.0464,lng:7.7742,region:"valais",type:"minor",labelDir:"e"},
+{id:"st_maurice",name:"St-Maurice",ja:"サン・モリス",lat:46.2183,lng:7.0025,region:"valais",type:"minor",labelDir:"w"},
+{id:"martigny",name:"Martigny",ja:"マルティニー",lat:46.1019,lng:7.0736,region:"valais",type:"minor",labelDir:"s"},
+{id:"aigle",name:"Aigle",ja:"エーグル",lat:46.3200,lng:6.9700,region:"valais",type:"minor",labelDir:"w"},
+{id:"champery",name:"Champéry",ja:"シャンペリー",lat:46.1747,lng:6.8697,region:"valais",type:"mountain",labelDir:"s"},
+{id:"leuk",name:"Leuk",ja:"ロイク",lat:46.3167,lng:7.6350,region:"valais",type:"minor",labelDir:"n"},
+{id:"gornergrat",name:"Gornergrat",ja:"ゴルナーグラート",lat:45.9836,lng:7.7847,region:"valais",type:"mountain",labelDir:"e"},
+{id:"riffelalp",name:"Riffelalp",ja:"リッフェルアルプ",lat:46.0011,lng:7.7594,region:"valais",type:"mountain",labelDir:"w"},
+{id:"andermatt",name:"Andermatt",ja:"アンデルマット",lat:46.6333,lng:8.5833,region:"valais",type:"minor",labelDir:"n"},
+{id:"realp",name:"Realp",ja:"レアルプ",lat:46.6156,lng:8.6231,region:"valais",type:"mountain",labelDir:"e"},
+{id:"disentis",name:"Disentis/Mustér",ja:"ディセンティス",lat:46.7011,lng:8.8539,region:"valais",type:"minor",labelDir:"n"},
+
+// --- ベルナーオーバーラント ---
+{id:"interlaken_ost",name:"Interlaken Ost",ja:"インターラーケン東駅",lat:46.6900,lng:7.8667,region:"oberland",type:"major",labelDir:"e"},
+{id:"interlaken_west",name:"Interlaken West",ja:"インターラーケン西駅",lat:46.6863,lng:7.8494,region:"oberland",type:"minor",labelDir:"s"},
+{id:"spiez",name:"Spiez",ja:"シュピーツ",lat:46.6863,lng:7.6772,region:"oberland",type:"minor",labelDir:"w"},
+{id:"zweisimmen",name:"Zweisimmen",ja:"ツヴァイジンメン",lat:46.5561,lng:7.3742,region:"oberland",type:"minor",labelDir:"w"},
+{id:"grindelwald",name:"Grindelwald",ja:"グリンデルワルト",lat:46.6244,lng:8.0342,region:"oberland",type:"major",labelDir:"e"},
+{id:"grindelwald_grund",name:"Grindelwald Grund",ja:"グリンデルワルト・グルント",lat:46.6172,lng:8.0378,region:"oberland",type:"mountain",labelDir:"s"},
+{id:"lauterbrunnen",name:"Lauterbrunnen",ja:"ラウターブルンネン",lat:46.5934,lng:7.9096,region:"oberland",type:"major",labelDir:"w"},
+{id:"wengen",name:"Wengen",ja:"ヴェンゲン",lat:46.6053,lng:7.9218,region:"oberland",type:"mountain",labelDir:"e"},
+{id:"wengernalp",name:"Wengernalp",ja:"ヴェンゲルンアルプ",lat:46.5931,lng:7.9433,region:"oberland",type:"mountain",labelDir:"s"},
+{id:"kleine_scheidegg",name:"Kleine Scheidegg",ja:"クライネ・シャイデック",lat:46.5850,lng:7.9611,region:"oberland",type:"mountain",labelDir:"n"},
+{id:"eigergletscher",name:"Eigergletscher",ja:"アイガーグレッチャー",lat:46.5772,lng:7.9761,region:"oberland",type:"mountain",labelDir:"e"},
+{id:"jungfraujoch",name:"Jungfraujoch",ja:"ユングフラウヨッホ",lat:46.5474,lng:7.9805,region:"oberland",type:"mountain",labelDir:"n"},
+{id:"brienz",name:"Brienz",ja:"ブリエンツ",lat:46.7581,lng:8.0356,region:"oberland",type:"minor",labelDir:"n"},
+{id:"meiringen",name:"Meiringen",ja:"マイリンゲン",lat:46.7311,lng:8.1858,region:"oberland",type:"minor",labelDir:"e"},
+{id:"gstaad",name:"Gstaad",ja:"グシュタード",lat:46.4719,lng:7.2861,region:"oberland",type:"minor",labelDir:"s"},
+{id:"lenk",name:"Lenk im Simmental",ja:"レンク",lat:46.4586,lng:7.4433,region:"oberland",type:"mountain",labelDir:"s"},
+
+// --- グラウビュンデン・南東部 ---
+{id:"chur",name:"Chur",ja:"クール",lat:46.8499,lng:9.5320,region:"graubunden",type:"major",labelDir:"w"},
+{id:"arosa",name:"Arosa",ja:"アローザ",lat:46.7833,lng:9.6833,region:"graubunden",type:"mountain",labelDir:"e"},
+{id:"davos_platz",name:"Davos Platz",ja:"ダヴォス・プラッツ",lat:46.8027,lng:9.8360,region:"graubunden",type:"minor",labelDir:"e"},
+{id:"davos_dorf",name:"Davos Dorf",ja:"ダヴォス・ドルフ",lat:46.8117,lng:9.8283,region:"graubunden",type:"minor",labelDir:"n"},
+{id:"klosters_platz",name:"Klosters Platz",ja:"クロスタース",lat:46.8722,lng:9.8814,region:"graubunden",type:"minor",labelDir:"n"},
+{id:"landquart",name:"Landquart",ja:"ラントクアルト",lat:46.9483,lng:9.5556,region:"graubunden",type:"minor",labelDir:"n"},
+{id:"thusis",name:"Thusis",ja:"トゥージス",lat:46.6989,lng:9.4356,region:"graubunden",type:"minor",labelDir:"w"},
+{id:"tiefencastel",name:"Tiefencastel",ja:"ティーフェンカステル",lat:46.6478,lng:9.5722,region:"graubunden",type:"minor",labelDir:"e"},
+{id:"st_moritz",name:"St. Moritz",ja:"サン・モリッツ",lat:46.4908,lng:9.8355,region:"graubunden",type:"major",labelDir:"s"},
+{id:"pontresina",name:"Pontresina",ja:"ポントレジーナ",lat:46.4903,lng:9.9047,region:"graubunden",type:"minor",labelDir:"e"},
+{id:"samedan",name:"Samedan",ja:"サメーダン",lat:46.5289,lng:9.8722,region:"graubunden",type:"minor",labelDir:"n"},
+{id:"zernez",name:"Zernez",ja:"ツェルネズ",lat:46.6942,lng:10.0994,region:"graubunden",type:"minor",labelDir:"e"},
+{id:"scuol_tarasp",name:"Scuol-Tarasp",ja:"スクオール・タラスプ",lat:46.7967,lng:10.2900,region:"graubunden",type:"minor",labelDir:"n"},
+{id:"poschiavo",name:"Poschiavo",ja:"ポスキアーヴォ",lat:46.3208,lng:10.0447,region:"graubunden",type:"minor",labelDir:"s"},
+
+// --- ティチーノ・南部 ---
+{id:"bellinzona",name:"Bellinzona",ja:"ベリンツォーナ",lat:46.1944,lng:9.0175,region:"ticino",type:"major",labelDir:"n"},
+{id:"lugano",name:"Lugano",ja:"ルガーノ",lat:46.0037,lng:8.9511,region:"ticino",type:"major",labelDir:"e"},
+{id:"locarno",name:"Locarno",ja:"ロカルノ",lat:46.1667,lng:8.7942,region:"ticino",type:"minor",labelDir:"w"},
+{id:"chiasso",name:"Chiasso",ja:"キアッソ",lat:45.8311,lng:9.0294,region:"ticino",type:"minor",labelDir:"s"},
+{id:"mendrisio",name:"Mendrisio",ja:"メンドリージオ",lat:45.8667,lng:8.9833,region:"ticino",type:"minor",labelDir:"w"},
+{id:"airolo",name:"Airolo",ja:"アイロロ",lat:46.5289,lng:8.6119,region:"ticino",type:"minor",labelDir:"n"},
+{id:"biasca",name:"Biasca",ja:"ビアスカ",lat:46.3597,lng:8.9700,region:"ticino",type:"minor",labelDir:"e"},
+];
+
+// 路線データ: id,name,company,type(mainline/regional/sbahn/mountain),rack(bool),scenic(bool),stations:[id...]
+const LINES = [
+{id:"l_zh_basel",name:"チューリッヒ〜バーゼル本線",company:"SBB",type:"mainline",stations:["zurich_hb","baden","brugg","basel_sbb"]},
+{id:"l_zh_bern",name:"チューリッヒ〜ベルン本線",company:"SBB",type:"mainline",stations:["zurich_hb","aarau","olten","bern"]},
+{id:"l_bern_basel",name:"ベルン〜バーゼル本線",company:"SBB",type:"mainline",stations:["bern","olten","basel_sbb"]},
+{id:"l_bern_geneva",name:"ベルン〜ジュネーブ本線",company:"SBB",type:"mainline",stations:["bern","fribourg","lausanne","morges","nyon","geneve","geneve_aeroport"]},
+{id:"l_lake_geneva",name:"レマン湖岸線",company:"SBB",type:"mainline",stations:["lausanne","vevey","montreux","aigle","st_maurice"]},
+{id:"l_zh_stgallen",name:"チューリッヒ〜ザンクトガレン本線",company:"SBB",type:"mainline",stations:["zurich_hb","zurich_oerlikon","winterthur","wil","st_gallen"]},
+{id:"l_stgallen_border",name:"ザンクトガレン〜国境方面",company:"SBB",type:"regional",stations:["st_gallen","rorschach","romanshorn","kreuzlingen"]},
+{id:"l_zh_chur",name:"チューリッヒ〜クール本線",company:"SBB",type:"mainline",stations:["zurich_hb","landquart","chur"]},
+{id:"l_basel_biel",name:"バーゼル〜ビール線",company:"SBB",type:"mainline",stations:["basel_sbb","delemont","biel"]},
+{id:"l_jura_foot",name:"ジュラ山麓線",company:"SBB",type:"mainline",stations:["biel","neuchatel","yverdon","lausanne"]},
+{id:"l_bern_thun_interlaken",name:"ベルン〜トゥーン〜インターラーケン線",company:"BLS/SBB",type:"mainline",stations:["bern","thun","spiez","interlaken_ost"]},
+{id:"l_loetschberg",name:"レッチュベルク線",company:"BLS",type:"mainline",stations:["spiez","visp","brig"]},
+{id:"l_rhone_valley",name:"ローヌ河谷線",company:"SBB",type:"mainline",stations:["brig","visp","sierre","sion","martigny","st_maurice","aigle","lausanne"]},
+{id:"l_visp_zermatt",name:"マッターホルン・ゴッタルド鉄道（フィスプ〜ツェルマット）",company:"MGB",type:"mountain",rack:true,stations:["visp","taesch","zermatt"]},
+{id:"l_gornergrat",name:"ゴルナーグラート鉄道",company:"GGB",type:"mountain",rack:true,stations:["zermatt","riffelalp","gornergrat"]},
+{id:"l_glacier_express",name:"氷河特急経路（ブリーク〜ディセンティス）",company:"MGB",type:"mountain",rack:true,scenic:true,stations:["brig","andermatt","realp","disentis"]},
+{id:"l_disentis_chur",name:"ディセンティス〜クール線",company:"RhB",type:"regional",stations:["disentis","chur"]},
+{id:"l_chur_arosa",name:"アローザ線",company:"RhB",type:"mountain",stations:["chur","arosa"]},
+{id:"l_chur_davos",name:"クール〜ダヴォス線",company:"RhB",type:"regional",stations:["chur","landquart","klosters_platz","davos_dorf","davos_platz"]},
+{id:"l_albula",name:"アルブラ線",company:"RhB",type:"mountain",scenic:true,stations:["chur","thusis","tiefencastel","samedan","st_moritz"]},
+{id:"l_bernina",name:"ベルニナ線",company:"RhB",type:"mountain",rack:false,scenic:true,stations:["st_moritz","pontresina","poschiavo"]},
+{id:"l_engadin",name:"エンガディン線",company:"RhB",type:"regional",stations:["samedan","zernez","scuol_tarasp"]},
+{id:"l_bob_grindelwald",name:"ベルナーオーバーラント鉄道（グリンデルワルト線）",company:"BOB",type:"mountain",stations:["interlaken_ost","grindelwald_grund","grindelwald"]},
+{id:"l_bob_lauterbrunnen",name:"ベルナーオーバーラント鉄道（ラウターブルンネン線）",company:"BOB",type:"mountain",stations:["interlaken_ost","interlaken_west","lauterbrunnen"]},
+{id:"l_wab",name:"ヴェンゲルンアルプ鉄道",company:"WAB",type:"mountain",rack:true,stations:["lauterbrunnen","wengen","wengernalp","kleine_scheidegg"]},
+{id:"l_wab_grund",name:"ヴェンゲルンアルプ鉄道（グルント線）",company:"WAB",type:"mountain",rack:true,stations:["grindelwald_grund","kleine_scheidegg"]},
+{id:"l_jungfraubahn",name:"ユングフラウ鉄道",company:"JB",type:"mountain",rack:true,scenic:true,stations:["kleine_scheidegg","eigergletscher","jungfraujoch"]},
+{id:"l_bruenig",name:"ブリューニック線",company:"Zentralbahn",type:"mountain",rack:true,stations:["interlaken_ost","brienz","meiringen","giswil","sarnen","luzern"]},
+{id:"l_goldenpass",name:"ゴールデンパス線",company:"BLS/MOB",type:"regional",scenic:true,stations:["interlaken_ost","spiez","zweisimmen","gstaad","montreux"]},
+{id:"l_lenk_branch",name:"レンク支線",company:"MOB",type:"mountain",stations:["zweisimmen","lenk"]},
+{id:"l_zh_luzern",name:"チューリッヒ〜ルツェルン線",company:"SBB",type:"mainline",stations:["zurich_hb","zug","luzern"]},
+{id:"l_luzern_goldau",name:"ルツェルン〜アルトゴルダウ線",company:"SBB",type:"mainline",stations:["luzern","arth_goldau","zug"]},
+{id:"l_gotthard",name:"ゴッタルド線",company:"SBB",type:"mainline",stations:["arth_goldau","biasca","bellinzona"]},
+{id:"l_bellinzona_chiasso",name:"ベリンツォーナ〜キアッソ線",company:"SBB",type:"mainline",stations:["bellinzona","lugano","mendrisio","chiasso"]},
+{id:"l_bellinzona_locarno",name:"ベリンツォーナ〜ロカルノ線",company:"SBB",type:"regional",stations:["bellinzona","locarno"]},
+{id:"l_rigi",name:"リギ鉄道",company:"Rigi Bahnen",type:"mountain",rack:true,stations:["vitznau","rigi_kulm"]},
+{id:"l_luzern_engelberg",name:"ルツェルン〜エンゲルベルク線",company:"Zentralbahn",type:"mountain",stations:["luzern","hergiswil","stans","engelberg"]},
+{id:"l_bern_luzern",name:"ベルン〜ルツェルン線（エメンタール経由）",company:"SBB",type:"regional",stations:["bern","burgdorf","langnau","luzern"]},
+{id:"l_bern_neuchatel",name:"ベルン〜ヌーシャテル線",company:"SBB",type:"regional",stations:["bern","murten","neuchatel"]},
+{id:"l_neuchatel_chauxdefonds",name:"ヌーシャテル〜ラ・ショード・フォン線",company:"SBB",type:"regional",stations:["neuchatel","chaux_de_fonds"]},
+{id:"l_martigny_champery",name:"マルティニー〜シャンペリー線",company:"TMR",type:"mountain",stations:["martigny","champery"]},
+{id:"l_visp_leuk",name:"フィスプ〜ロイク線",company:"SBB",type:"mainline",stations:["visp","leuk","sierre"]},
+{id:"l_zh_sbahn_ring",name:"チューリッヒ S-Bahn（都心環状）",company:"ZVV/SBB",type:"sbahn",stations:["zurich_flughafen","zurich_oerlikon","zurich_hb","zurich_hardbruecke","zurich_enge","zurich_stadelhofen","zurich_oerlikon"]},
+{id:"l_zh_uster_rapperswil",name:"チューリッヒ S-Bahn（東方面）",company:"ZVV/SBB",type:"sbahn",stations:["zurich_hb","zurich_stadelhofen","uster","rapperswil"]},
+{id:"l_zh_buelach_schaffhausen",name:"チューリッヒ〜シャフハウゼン線",company:"SBB",type:"regional",stations:["zurich_flughafen","buelach","schaffhausen"]},
+{id:"l_winterthur_frauenfeld",name:"ヴィンタートゥール〜フラウエンフェルト〜ヴィール線",company:"SBB",type:"regional",stations:["winterthur","frauenfeld","wil"]},
+{id:"l_basel_liestal_solothurn",name:"バーゼル〜ゾロトゥルン線",company:"SBB",type:"regional",stations:["basel_sbb","liestal","solothurn"]},
+{id:"l_basel_rheinfelden",name:"バーゼル〜ラインフェルデン線",company:"SBB",type:"regional",stations:["basel_sbb","rheinfelden"]},
+{id:"l_basel_bad",name:"バーゼル国際連絡線",company:"DB/SBB",type:"mainline",stations:["basel_sbb","basel_bad"]},
+];
+
+// 国境方面表示（矢印テキスト）
+const BORDER_ARROWS = [
+  {stationId:"basel_bad",label:"→ Germany",dx:6,dy:-10},
+  {stationId:"schaffhausen",label:"→ Germany",dx:6,dy:-10},
+  {stationId:"kreuzlingen",label:"→ Germany",dx:6,dy:-10},
+  {stationId:"geneve",label:"→ France",dx:-46,dy:6},
+  {stationId:"basel_sbb",label:"→ France",dx:-50,dy:14},
+  {stationId:"chiasso",label:"→ Italy",dx:6,dy:14},
+  {stationId:"poschiavo",label:"→ Italy",dx:6,dy:14},
+  {stationId:"scuol_tarasp",label:"→ Austria",dx:6,dy:-10},
+];
+
+// 湖の簡易表示（装飾のみ・概略）
+const LAKES = [
+  {name:"Lake Geneva", pts:[[46.45,6.15],[46.28,6.55],[46.38,6.95],[46.52,6.75],[46.50,6.35],[46.45,6.15]]},
+  {name:"Lake Zurich", pts:[[47.37,8.53],[47.22,8.82],[47.28,8.75],[47.35,8.58],[47.37,8.53]]},
+  {name:"Lake Constance", pts:[[47.55,9.15],[47.50,9.65],[47.68,9.35],[47.66,9.05],[47.55,9.15]]},
+  {name:"Lake Lucerne", pts:[[47.05,8.31],[46.98,8.46],[46.95,8.35],[47.02,8.28],[47.05,8.31]]},
+  {name:"Lake Maggiore", pts:[[46.17,8.79],[45.95,8.80],[46.05,8.85],[46.16,8.82],[46.17,8.79]]},
+  {name:"Lake Neuchâtel", pts:[[47.00,6.94],[46.80,6.85],[46.85,6.90],[46.98,6.95],[47.00,6.94]]},
+];
+
+/* =========================================================================
+   セットアップ
+   ========================================================================= */
+const svg = document.getElementById('map');
+const geoLayer = document.getElementById('geoLayer');
+const lineLayer = document.getElementById('lineLayer');
+const stationLayer = document.getElementById('stationLayer');
+const labelLayer = document.getElementById('labelLayer');
+const highlightLayer = document.getElementById('highlightLayer');
+
+const stationsById = {};
+STATIONS.forEach(s=>{
+  const p = project(s.lat,s.lng);
+  s.x = p.x; s.y = p.y;
+  s.lines = [];
+  stationsById[s.id] = s;
+});
+LINES.forEach(l=>{
+  l.stations.forEach(id=>{
+    if(stationsById[id] && !stationsById[id].lines.includes(l.id)) stationsById[id].lines.push(l.id);
+  });
+});
+const linesById = {};
+LINES.forEach(l=>linesById[l.id]=l);
+
+const TYPE_COLOR = {
+  mainline:"var(--track-main)",
+  regional:"var(--track-regional)",
+  sbahn:"var(--track-sbahn)",
+  mountain:"var(--track-mountain)",
+};
+const TYPE_LABEL_JA = {
+  mainline:"主要鉄道", regional:"地方鉄道", sbahn:"S-Bahn", mountain:"山岳・登山鉄道"
+};
+
+/* ---- カメラ（viewBox）状態 ---- */
+let camera = {x:0,y:0,w:1700,h:1300};
+const WORLD = {minW:80, maxW:2800};
+
+function clampCamera(){
+  camera.w = Math.max(WORLD.minW, Math.min(WORLD.maxW, camera.w));
+  camera.h = camera.w * (1300/1700);
+}
+function setViewBox(){
+  // viewBox の書き換えのみ（軽量）。パン中はズーム段階が変わらないので
+  // ラベルの表示/非表示判定を毎フレーム再計算する必要がなく、これにより
+  // スワイプ時の引っかかり（カクつき）を防ぐ。
+  svg.setAttribute('viewBox', `${camera.x} ${camera.y} ${camera.w} ${camera.h}`);
+}
+function applyViewBox(){
+  setViewBox();
+  updateLabelVisibility();
+}
+function tweenCamera(target, duration=550){
+  cancelInertia();
+  const start = {...camera};
+  const t0 = performance.now();
+  function step(now){
+    const t = Math.min(1,(now-t0)/duration);
+    const e = 1-Math.pow(1-t,3); // ease-out cubic
+    camera.x = start.x + (target.x-start.x)*e;
+    camera.y = start.y + (target.y-start.y)*e;
+    camera.w = start.w + (target.w-start.w)*e;
+    camera.h = start.h + (target.h-start.h)*e;
+    applyViewBox();
+    if(t<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+/* ---- 地理装飾（湖）描画 ---- */
+LAKES.forEach(lk=>{
+  const pts = lk.pts.map(([lat,lng])=>{const p=project(lat,lng); return `${p.x},${p.y}`;}).join(' ');
+  const poly = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+  poly.setAttribute('points',pts);
+  poly.setAttribute('class','geo-lake');
+  geoLayer.appendChild(poly);
+});
+
+/* ---- 路線描画 ---- */
+LINES.forEach(line=>{
+  const pathPts = line.stations.map(id=>stationsById[id]).filter(Boolean);
+  if(pathPts.length<2) return;
+  const d = pathPts.map((s,i)=> (i===0?'M':'L')+s.x+','+s.y).join(' ');
+
+  // 0) 白/背景色のケーシング（縁取り）— 背景や他の要素と重なっても線の存在がわかるように
+  const casing = document.createElementNS('http://www.w3.org/2000/svg','path');
+  casing.setAttribute('d',d);
+  casing.setAttribute('class','track-casing');
+  const casingW = line.type==='mainline' ? 9 : (line.rack ? 9.2 : 8);
+  casing.style.strokeWidth = casingW;
+  casing.dataset.lineId = line.id;
+  casing.dataset.type = line.type;
+  casing.dataset.rack = line.rack? "1":"0";
+  casing.dataset.isCasing = "1";
+  lineLayer.appendChild(casing);
+
+  // 1) 種別ごとに模様（実線/破線/ドット/一点鎖線）が異なる本体の線
+  const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('d',d);
+  path.setAttribute('class', 'track '+line.type+(line.rack?' rack':''));
+  path.dataset.lineId = line.id;
+  path.dataset.type = line.type;
+  path.dataset.rack = line.rack? "1":"0";
+  path.dataset.scenic = line.scenic? "1":"0";
+  lineLayer.appendChild(path);
+
+  // 2) ラック式（登山鉄道）は、黒×白の交互ティックで「ラック軌条」を表現（日本の路線図のJR線のような視認性）
+  if(line.rack){
+    const tickA = document.createElementNS('http://www.w3.org/2000/svg','path');
+    tickA.setAttribute('d',d); tickA.setAttribute('class','rack-tick tick-a');
+    tickA.dataset.lineId = line.id; tickA.dataset.type = line.type; tickA.dataset.rack="1";
+    lineLayer.appendChild(tickA);
+    const tickB = document.createElementNS('http://www.w3.org/2000/svg','path');
+    tickB.setAttribute('d',d); tickB.setAttribute('class','rack-tick tick-b');
+    tickB.dataset.lineId = line.id; tickB.dataset.type = line.type; tickB.dataset.rack="1";
+    lineLayer.appendChild(tickB);
+  }
+
+  // 3) 観光路線（氷河特急・ベルニナ線など）は紫のドット破線を最前面にオーバーレイ
+  if(line.scenic){
+    const overlay = document.createElementNS('http://www.w3.org/2000/svg','path');
+    overlay.setAttribute('d',d);
+    overlay.setAttribute('class','track scenic-overlay');
+    overlay.dataset.scenic="1";
+    overlay.dataset.overlay="1";
+    overlay.dataset.lineId = line.id;
+    lineLayer.appendChild(overlay);
+  }
+});
+
+/* ---- 国境方向表示 ---- */
+BORDER_ARROWS.forEach(b=>{
+  const s = stationsById[b.stationId];
+  if(!s) return;
+  const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+  t.setAttribute('x', s.x+b.dx);
+  t.setAttribute('y', s.y+b.dy);
+  t.setAttribute('class','border-arrow-text');
+  t.textContent = b.label;
+  geoLayer.appendChild(t);
+});
+
+/* ---- 駅・ラベル描画（重なり回避アルゴリズム） ---- */
+function showThreshold(type){
+  // camera.w がこの値未満のときにラベル/駅を表示
+  if(type==='major') return 100000; // 常時表示
+  if(type==='mountain') return 520;
+  return 320; // minor
+}
+
+// 1) 駅マーカーを描画
+STATIONS.forEach(s=>{
+  const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+  dot.setAttribute('cx',s.x); dot.setAttribute('cy',s.y);
+  dot.setAttribute('r', s.type==='major'?4.2:3);
+  dot.setAttribute('class','station-dot '+s.type);
+  dot.dataset.stationId = s.id;
+  dot.dataset.threshold = showThreshold(s.type);
+  dot.addEventListener('click',()=>openStationInfo(s.id));
+  stationLayer.appendChild(dot);
+});
+
+// 2) ラベル文字列を先に描画して実際の文字幅を計測（フォント指定はCSSクラス経由）
+const labelItems = STATIONS.map(s=>{
+  const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+  g.setAttribute('class','label-group');
+  g.dataset.stationId = s.id;
+  g.dataset.threshold = showThreshold(s.type);
+  g.addEventListener('click',()=>openStationInfo(s.id));
+
+  const leader = document.createElementNS('http://www.w3.org/2000/svg','line');
+  leader.setAttribute('class','leader');
+  g.appendChild(leader);
+
+  const t1 = document.createElementNS('http://www.w3.org/2000/svg','text');
+  t1.setAttribute('class','label-local');
+  t1.textContent = s.name;
+  g.appendChild(t1);
+
+  const t2 = document.createElementNS('http://www.w3.org/2000/svg','text');
+  t2.setAttribute('class','label-ja');
+  t2.textContent = s.ja;
+  g.appendChild(t2);
+
+  labelLayer.appendChild(g);
+  const w = Math.max(t1.getBBox().width, t2.getBBox().width) + 3;
+  const h = 22; // 現地語+日本語 2行分の高さ（概算）
+  return {s,g,leader,t1,t2,w,h};
+});
+
+// 3) 候補方向・距離を総当たりし、既存の駅マーカー/確定済みラベルと重ならない
+//    位置を優先度順（主要駅 → 山岳駅 → 一般駅）に探索する
+const DIRS = [
+  {k:'n', ux:0,    uy:-1,   anchor:'middle'},
+  {k:'s', ux:0,    uy:1,    anchor:'middle'},
+  {k:'e', ux:1,    uy:0,    anchor:'start'},
+  {k:'w', ux:-1,   uy:0,    anchor:'end'},
+  {k:'ne',ux:0.72, uy:-0.72,anchor:'start'},
+  {k:'nw',ux:-0.72,uy:-0.72,anchor:'end'},
+  {k:'se',ux:0.72, uy:0.72, anchor:'start'},
+  {k:'sw',ux:-0.72,uy:0.72, anchor:'end'},
+];
+const DIR_ORDER_BASE = ['n','s','e','w','ne','nw','se','sw'];
+const RADII = [14,22,32,46,64,86,112,145,185];
+
+function dirOrder(pref){
+  const idx = DIR_ORDER_BASE.indexOf(pref);
+  if(idx<=0) return DIR_ORDER_BASE;
+  return [...DIR_ORDER_BASE.slice(idx), ...DIR_ORDER_BASE.slice(0,idx)];
+}
+function candidateBox(item, dir, r){
+  const cx = item.s.x + dir.ux*r, cy = item.s.y + dir.uy*r;
+  let minX,maxX;
+  if(dir.anchor==='middle'){ minX=cx-item.w/2; maxX=cx+item.w/2; }
+  else if(dir.anchor==='start'){ minX=cx; maxX=cx+item.w; }
+  else { minX=cx-item.w; maxX=cx; }
+  return {minX, minY:cy-item.h/2, maxX, maxY:cy+item.h/2, cx, cy};
+}
+function overlapArea(a,b,pad){
+  const ox = Math.min(a.maxX+pad,b.maxX)-Math.max(a.minX-pad,b.minX);
+  const oy = Math.min(a.maxY+pad,b.maxY)-Math.max(a.minY-pad,b.minY);
+  if(ox<=0||oy<=0) return 0;
+  return ox*oy;
+}
+
+const placedBoxes = [];
+STATIONS.forEach(s=>{
+  const r = (s.type==='major'?4.2:3)+2.5;
+  placedBoxes.push({minX:s.x-r,minY:s.y-r,maxX:s.x+r,maxY:s.y+r});
+});
+
+const PRIORITY = {major:0, mountain:1, minor:2};
+const orderedItems = [...labelItems].sort((a,b)=>PRIORITY[a.s.type]-PRIORITY[b.s.type]);
+
+orderedItems.forEach(item=>{
+  const order = dirOrder(item.s.labelDir||'n');
+  let best=null, bestScore=Infinity;
+  outer:
+  for(const r of RADII){
+    for(const key of order){
+      const dir = DIRS.find(d=>d.k===key);
+      const box = candidateBox(item, dir, r);
+      let score=0;
+      for(const p of placedBoxes){ score += overlapArea(box,p,3); }
+      if(score===0){ best={box,dir,r}; bestScore=0; break outer; }
+      if(score<bestScore){ bestScore=score; best={box,dir,r}; }
+    }
+  }
+  placedBoxes.push(best.box);
+  item.finalBox = best.box; item.dir = best.dir; item.r = best.r;
+});
+
+// 4) 確定した位置へテキストと引き出し線を反映
+labelItems.forEach(item=>{
+  const box = item.finalBox, anchor = item.dir.anchor;
+  const tx = anchor==='middle' ? box.cx : (anchor==='start' ? box.minX : box.maxX);
+  const cy = (box.minY+box.maxY)/2;
+  item.t1.setAttribute('x',tx); item.t1.setAttribute('y',cy-3);
+  item.t1.setAttribute('text-anchor',anchor);
+  item.t2.setAttribute('x',tx); item.t2.setAttribute('y',cy+10);
+  item.t2.setAttribute('text-anchor',anchor);
+
+  if(item.r>18){
+    item.leader.setAttribute('x1',item.s.x); item.leader.setAttribute('y1',item.s.y);
+    item.leader.setAttribute('x2', item.s.x + item.dir.ux*(item.r-7));
+    item.leader.setAttribute('y2', item.s.y + item.dir.uy*(item.r-7));
+  } else {
+    item.leader.setAttribute('x1',item.s.x); item.leader.setAttribute('y1',item.s.y);
+    item.leader.setAttribute('x2',item.s.x); item.leader.setAttribute('y2',item.s.y);
+  }
+});
+
+function updateLabelVisibility(){
+  const w = camera.w;
+  document.querySelectorAll('#labelLayer .label-group, #stationLayer .station-dot').forEach(el=>{
+    const th = parseFloat(el.dataset.threshold);
+    el.style.display = (w < th) ? '' : 'none';
+  });
+}
+
+/* ---- 検索用インデックス ---- */
+function normalize(str){
+  return str.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[\s\-\/\.,]/g,'');
+}
+STATIONS.forEach(s=>{
+  s._normLocal = normalize(s.name);
+  s._normJa = normalize(s.ja);
+});
+function searchStations(query){
+  const q = normalize(query);
+  if(!q) return [];
+  const starts=[], contains=[];
+  STATIONS.forEach(s=>{
+    const inLocal = s._normLocal.includes(q);
+    const inJa = s._normJa.includes(q);
+    if(!inLocal && !inJa) return;
+    const startsMatch = s._normLocal.startsWith(q) || s._normJa.startsWith(q);
+    (startsMatch?starts:contains).push(s);
+  });
+  return [...starts, ...contains.filter(s=>!starts.includes(s))].slice(0,10);
+}
+
+/* ---- 検索 UI ---- */
+const searchInput = document.getElementById('searchInput');
+const suggestionsEl = document.getElementById('suggestions');
+const REGION_BY_ID = {}; REGIONS.forEach(r=>REGION_BY_ID[r.id]=r);
+
+function renderSuggestions(list){
+  suggestionsEl.innerHTML='';
+  if(list.length===0){
+    suggestionsEl.innerHTML = '<div class="sugg-empty">駅が見つかりませんでした</div>';
+    suggestionsEl.classList.add('show');
+    return;
+  }
+  list.forEach(s=>{
+    const item = document.createElement('div');
+    item.className='sugg-item';
+    const region = REGION_BY_ID[s.region] ? REGION_BY_ID[s.region].name : '';
+    item.innerHTML = `<div class="sugg-local">${escapeHtml(s.name)}</div><div class="sugg-ja">${escapeHtml(s.ja)}</div><div class="sugg-region">${escapeHtml(region)}</div>`;
+    item.addEventListener('click',()=>{
+      searchInput.value = s.name;
+      suggestionsEl.classList.remove('show');
+      focusStation(s.id);
+      openStationInfo(s.id);
+    });
+    suggestionsEl.appendChild(item);
+  });
+  suggestionsEl.classList.add('show');
+}
+function escapeHtml(str){
+  return str.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+searchInput.addEventListener('input',()=>{
+  const list = searchStations(searchInput.value);
+  if(searchInput.value.trim()==='') { suggestionsEl.classList.remove('show'); return; }
+  renderSuggestions(list);
+});
+searchInput.addEventListener('focus',()=>{
+  if(searchInput.value.trim()!=='') renderSuggestions(searchStations(searchInput.value));
+});
+document.addEventListener('click',(e)=>{
+  if(!suggestionsEl.contains(e.target) && e.target!==searchInput){
+    suggestionsEl.classList.remove('show');
+  }
+});
+function doSearch(){
+  const list = searchStations(searchInput.value);
+  if(list.length===0){
+    showToast('駅が見つかりませんでした');
+    return;
+  }
+  suggestionsEl.classList.remove('show');
+  focusStation(list[0].id);
+  openStationInfo(list[0].id);
+}
+document.getElementById('searchBtn').addEventListener('click',doSearch);
+searchInput.addEventListener('keydown',(e)=>{
+  if(e.key==='Enter'){ e.preventDefault(); doSearch(); }
+});
+
+/* ---- フォーカス & ハイライト ---- */
+function focusStation(id, zoomW=180){
+  const s = stationsById[id];
+  if(!s) return;
+  const w = zoomW, h = w*(1300/1700);
+  tweenCamera({x:s.x-w/2, y:s.y-h/2, w, h});
+  highlightStation(s);
+}
+function highlightStation(s){
+  highlightLayer.innerHTML='';
+  const c1 = document.createElementNS('http://www.w3.org/2000/svg','circle');
+  c1.setAttribute('cx',s.x); c1.setAttribute('cy',s.y); c1.setAttribute('r',6);
+  c1.setAttribute('class','pulse');
+  highlightLayer.appendChild(c1);
+  const c2 = document.createElementNS('http://www.w3.org/2000/svg','circle');
+  c2.setAttribute('cx',s.x); c2.setAttribute('cy',s.y); c2.setAttribute('r',6);
+  highlightLayer.appendChild(c2);
+  setTimeout(()=>{ if(highlightLayer.contains(c1)) highlightLayer.innerHTML=''; }, 6000);
+}
+
+/* ---- 駅情報パネル ---- */
+const infoPanel = document.getElementById('infoPanel');
+function openStationInfo(id){
+  const s = stationsById[id];
+  if(!s) return;
+  document.getElementById('infoLocal').textContent = s.name;
+  document.getElementById('infoJa').textContent = s.ja;
+  document.getElementById('infoRegion').textContent = REGION_BY_ID[s.region]?REGION_BY_ID[s.region].name:'';
+  const typeJa = s.type==='major' ? '主要駅' : (s.type==='mountain' ? '山岳鉄道の駅' : '一般駅');
+  document.getElementById('infoType').textContent = typeJa;
+  const linesEl = document.getElementById('infoLines');
+  linesEl.innerHTML='';
+  s.lines.forEach(lid=>{
+    const line = linesById[lid];
+    if(!line) return;
+    const chip = document.createElement('span');
+    chip.className='line-chip';
+    chip.style.background = getComputedColor(line.type);
+    chip.textContent = line.name;
+    linesEl.appendChild(chip);
+  });
+  infoPanel.classList.add('show');
+  infoPanel.dataset.stationId = id;
+  highlightStation(s);
+}
+function getComputedColor(type){
+  const map = {mainline:'#c8102e',regional:'#2e7d32',sbahn:'#1565c0',mountain:'#e65100'};
+  return map[type]||'#555';
+}
+document.getElementById('closeInfo').addEventListener('click',()=>infoPanel.classList.remove('show'));
+document.getElementById('btnFocus').addEventListener('click',()=>{
+  const id = infoPanel.dataset.stationId;
+  if(id) focusStation(id, 180);
+});
+document.getElementById('btnZoomAround').addEventListener('click',()=>{
+  const id = infoPanel.dataset.stationId;
+  if(id) focusStation(id, 80);
+});
+
+/* ---- トースト ---- */
+let toastTimer=null;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+/* ---- 地域タブ ---- */
+const regionTabs = document.getElementById('regionTabs');
+REGIONS.forEach(r=>{
+  const btn = document.createElement('button');
+  btn.className='region-btn'+(r.id==='all'?' active':'');
+  btn.textContent = r.name;
+  btn.dataset.regionId = r.id;
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.region-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const [x,y,w,h] = r.box;
+    tweenCamera({x,y,w,h});
+    infoPanel.classList.remove('show');
+  });
+  regionTabs.appendChild(btn);
+});
+
+/* ---- 凡例（実際の線の模様をそのまま縮小表示） ---- */
+const legendRows = document.getElementById('legendRows');
+function makeLineSwatch(type, rack){
+  const svgNS='http://www.w3.org/2000/svg';
+  const icon = document.createElementNS(svgNS,'svg');
+  icon.setAttribute('viewBox','0 0 28 12');
+  icon.setAttribute('width','28'); icon.setAttribute('height','12');
+  icon.style.flex='0 0 auto'; icon.style.overflow='visible';
+  const d='M1,6 L27,6';
+  const casing = document.createElementNS(svgNS,'path');
+  casing.setAttribute('d',d); casing.setAttribute('class','track-casing');
+  casing.style.strokeWidth = type==='mainline'?9:(rack?9.2:8);
+  icon.appendChild(casing);
+  const path = document.createElementNS(svgNS,'path');
+  path.setAttribute('d',d);
+  path.setAttribute('class', 'track '+type+(rack?' rack':''));
+  icon.appendChild(path);
+  if(rack){
+    const tA = document.createElementNS(svgNS,'path'); tA.setAttribute('d',d); tA.setAttribute('class','rack-tick tick-a'); icon.appendChild(tA);
+    const tB = document.createElementNS(svgNS,'path'); tB.setAttribute('d',d); tB.setAttribute('class','rack-tick tick-b'); icon.appendChild(tB);
+  }
+  return icon;
+}
+function makeScenicSwatch(){
+  const svgNS='http://www.w3.org/2000/svg';
+  const icon = document.createElementNS(svgNS,'svg');
+  icon.setAttribute('viewBox','0 0 28 12');
+  icon.setAttribute('width','28'); icon.setAttribute('height','12');
+  icon.style.flex='0 0 auto';
+  const path = document.createElementNS(svgNS,'path');
+  path.setAttribute('d','M1,6 L27,6');
+  path.setAttribute('class','track scenic-overlay');
+  path.style.opacity='1';
+  icon.appendChild(path);
+  return icon;
+}
+const LINE_LEGEND = [
+  {type:'mainline', rack:false, label:'主要鉄道（実線）'},
+  {type:'regional', rack:false, label:'地方鉄道（破線）'},
+  {type:'sbahn',    rack:false, label:'S-Bahn（丸ドット）'},
+  {type:'mountain', rack:false, label:'山岳鉄道（一点鎖線）'},
+  {type:'mountain', rack:true,  label:'登山鉄道・ラック式（黒白ティック）'},
+];
+LINE_LEGEND.forEach(item=>{
+  const row = document.createElement('div');
+  row.className='legend-row';
+  row.appendChild(makeLineSwatch(item.type,item.rack));
+  const span = document.createElement('span'); span.textContent=item.label;
+  row.appendChild(span);
+  legendRows.appendChild(row);
+});
+{
+  const row = document.createElement('div');
+  row.className='legend-row';
+  row.appendChild(makeScenicSwatch());
+  const span = document.createElement('span'); span.textContent='観光路線（紫ドット重ね）';
+  row.appendChild(span);
+  legendRows.appendChild(row);
+}
+[["major","主要駅"],["minor","一般駅"],["mountain","山岳駅"]].forEach(([cls,label])=>{
+  const row = document.createElement('div');
+  row.className='legend-row';
+  const color = cls==='major'?'var(--station-major)':(cls==='mountain'?'#e65100':'var(--station-minor)');
+  row.innerHTML = `<span class="legend-dot" style="background:${color}"></span><span>${label}</span>`;
+  legendRows.appendChild(row);
+});
+
+/* ---- レイヤー切り替え ---- */
+const layerRows = document.getElementById('layerRows');
+const LAYER_DEFS = [
+  {key:'mainline', label:'主要鉄道', sel:'[data-type="mainline"]:not(.scenic-overlay)'},
+  {key:'regional', label:'地方鉄道', sel:'[data-type="regional"]:not(.scenic-overlay)'},
+  {key:'sbahn', label:'S-Bahn', sel:'[data-type="sbahn"]:not(.scenic-overlay)'},
+  {key:'mountain', label:'山岳鉄道', sel:'[data-type="mountain"][data-rack="0"]:not(.scenic-overlay)'},
+  {key:'rack', label:'登山鉄道（ラック式）', sel:'[data-type="mountain"][data-rack="1"]'},
+  {key:'scenic', label:'観光路線オーバーレイ', sel:'.track.scenic-overlay'},
+  {key:'stationsMinor', label:'一般駅', sel:'.station-dot.minor, .label-group[data-station-id]'}, // handled specially below
+  {key:'stationsMajor', label:'主要駅', sel:'.station-dot.major'},
+  {key:'geo', label:'湖・地形', sel:'.geo-lake, .geo-mtn, .border-arrow-text'},
+];
+LAYER_DEFS.forEach(def=>{
+  const row = document.createElement('div');
+  row.className='layer-row';
+  const cid = 'layer_'+def.key;
+  row.innerHTML = `<input type="checkbox" id="${cid}" checked><label for="${cid}">${def.label}</label>`;
+  layerRows.appendChild(row);
+  row.querySelector('input').addEventListener('change',(e)=>{
+    const checked = e.target.checked;
+    if(def.key==='stationsMinor'){
+      document.querySelectorAll('.station-dot.minor, .station-dot.mountain').forEach(el=>el.dataset.layerHidden = checked? '':'1');
+      document.querySelectorAll('#labelLayer .label-group').forEach(el=>{
+        const id = el.dataset.stationId;
+        const s = stationsById[id];
+        if(s && s.type!=='major') el.dataset.layerHidden = checked? '':'1';
+      });
+    } else if(def.key==='stationsMajor'){
+      document.querySelectorAll('.station-dot.major').forEach(el=>el.dataset.layerHidden = checked? '':'1');
+      document.querySelectorAll('#labelLayer .label-group').forEach(el=>{
+        const id = el.dataset.stationId;
+        const s = stationsById[id];
+        if(s && s.type==='major') el.dataset.layerHidden = checked? '':'1';
+      });
+    } else {
+      document.querySelectorAll(def.sel).forEach(el=> el.style.display = checked? '' : 'none');
+    }
+    refreshVisibilityCombined();
+  });
+});
+function refreshVisibilityCombined(){
+  document.querySelectorAll('[data-layer-hidden]').forEach(el=>{
+    if(el.dataset.layerHidden==='1') el.style.setProperty('display','none','important');
+    else el.style.removeProperty('display');
+  });
+  updateLabelVisibility();
+}
+
+/* ---- ズーム & パン操作 ---- */
+function screenToUser(clientX, clientY){
+  const rect = svg.getBoundingClientRect();
+  const px = (clientX-rect.left)/rect.width;
+  const py = (clientY-rect.top)/rect.height;
+  return { x: camera.x + px*camera.w, y: camera.y + py*camera.h, px, py };
+}
+function zoomAt(clientX, clientY, factor){
+  cancelInertia();
+  const before = screenToUser(clientX, clientY);
+  let newW = camera.w * factor;
+  newW = Math.max(WORLD.minW, Math.min(WORLD.maxW, newW));
+  const newH = newW * (1300/1700);
+  camera.x = before.x - before.px*newW;
+  camera.y = before.y - before.py*newH;
+  camera.w = newW; camera.h = newH;
+  applyViewBox();
+}
+svg.addEventListener('wheel',(e)=>{
+  e.preventDefault();
+  const factor = e.deltaY>0 ? 1.15 : 1/1.15;
+  zoomAt(e.clientX, e.clientY, factor);
+},{passive:false});
+
+document.getElementById('zoomIn').addEventListener('click',()=>{
+  const rect = svg.getBoundingClientRect();
+  zoomAt(rect.left+rect.width/2, rect.top+rect.height/2, 1/1.4);
+});
+document.getElementById('zoomOut').addEventListener('click',()=>{
+  const rect = svg.getBoundingClientRect();
+  zoomAt(rect.left+rect.width/2, rect.top+rect.height/2, 1.4);
+});
+
+/* ---- パン処理: rAFでイベントをまとめて適用し、離した後は慣性で滑らせる ---- */
+let panRAF = null, pendingDx = 0, pendingDy = 0;
+function schedulePan(dx, dy){
+  pendingDx += dx; pendingDy += dy;
+  if(panRAF) return;
+  panRAF = requestAnimationFrame(()=>{
+    camera.x -= pendingDx; camera.y -= pendingDy;
+    pendingDx = 0; pendingDy = 0;
+    setViewBox(); // パン中はラベル表示判定を再計算しない（引っかかり防止）
+    panRAF = null;
+  });
+}
+let velSamples = [];
+function recordVelocitySample(dx, dy){
+  const t = performance.now();
+  velSamples.push({t,dx,dy});
+  const cutoff = t - 120;
+  while(velSamples.length && velSamples[0].t < cutoff) velSamples.shift();
+}
+let inertiaRAF = null;
+function cancelInertia(){
+  if(inertiaRAF){ cancelAnimationFrame(inertiaRAF); inertiaRAF=null; }
+}
+function startInertia(vx, vy){
+  cancelInertia();
+  let last = performance.now();
+  const DECAY_PER_SEC = 0.05; // 1秒でおよそ5%まで減速
+  function frame(now){
+    const dt = Math.min(now-last, 48); last = now;
+    camera.x -= vx*dt; camera.y -= vy*dt;
+    setViewBox();
+    const decay = Math.pow(DECAY_PER_SEC, dt/1000);
+    vx *= decay; vy *= decay;
+    if(Math.hypot(vx,vy)*1000 > 8){
+      inertiaRAF = requestAnimationFrame(frame);
+    } else {
+      inertiaRAF = null;
+      updateLabelVisibility();
+    }
+  }
+  inertiaRAF = requestAnimationFrame(frame);
+}
+function releaseWithInertia(){
+  const now = performance.now();
+  if(velSamples.length===0){ updateLabelVisibility(); return; }
+  const span = Math.max(now - velSamples[0].t, 1);
+  const sumDx = velSamples.reduce((a,s)=>a+s.dx,0);
+  const sumDy = velSamples.reduce((a,s)=>a+s.dy,0);
+  velSamples = [];
+  let vx = sumDx/span, vy = sumDy/span; // world units / ms
+  const speed = Math.hypot(vx,vy);
+  if(speed*1000 < 25){ updateLabelVisibility(); return; } // 遅すぎる場合は慣性なし
+  const maxSpeed = 3.5; // 暴走防止の上限
+  if(speed > maxSpeed){ const k = maxSpeed/speed; vx*=k; vy*=k; }
+  startInertia(vx, vy);
+}
+
+let dragging=false, lastX=0, lastY=0;
+svg.addEventListener('mousedown',(e)=>{
+  dragging=true; lastX=e.clientX; lastY=e.clientY;
+  svg.classList.add('dragging');
+  cancelInertia(); velSamples=[];
+});
+window.addEventListener('mousemove',(e)=>{
+  if(!dragging) return;
+  const rect = svg.getBoundingClientRect();
+  const dx = (e.clientX-lastX)/rect.width*camera.w;
+  const dy = (e.clientY-lastY)/rect.height*camera.h;
+  lastX=e.clientX; lastY=e.clientY;
+  schedulePan(dx,dy);
+  recordVelocitySample(dx,dy);
+});
+window.addEventListener('mouseup',()=>{
+  if(!dragging) return;
+  dragging=false; svg.classList.remove('dragging');
+  releaseWithInertia();
+});
+
+/* touch: pan + pinch */
+let touchState=null;
+svg.addEventListener('touchstart',(e)=>{
+  cancelInertia();
+  if(e.touches.length===1){
+    touchState = {mode:'pan', x:e.touches[0].clientX, y:e.touches[0].clientY};
+    velSamples=[];
+  } else if(e.touches.length===2){
+    const [a,b] = e.touches;
+    touchState = {
+      mode:'pinch',
+      dist: Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY),
+      midX:(a.clientX+b.clientX)/2, midY:(a.clientY+b.clientY)/2,
+      camW: camera.w
+    };
+  }
+},{passive:true});
+svg.addEventListener('touchmove',(e)=>{
+  if(!touchState) return;
+  if(touchState.mode==='pan' && e.touches.length===1){
+    const rect = svg.getBoundingClientRect();
+    const t = e.touches[0];
+    const dx = (t.clientX-touchState.x)/rect.width*camera.w;
+    const dy = (t.clientY-touchState.y)/rect.height*camera.h;
+    touchState.x = t.clientX; touchState.y = t.clientY;
+    schedulePan(dx,dy);
+    recordVelocitySample(dx,dy);
+  } else if(touchState.mode==='pinch' && e.touches.length===2){
+    const [a,b] = e.touches;
+    const dist = Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
+    const factor = touchState.dist/Math.max(dist,1);
+    const midX=(a.clientX+b.clientX)/2, midY=(a.clientY+b.clientY)/2;
+    zoomAt(midX, midY, factor);
+    touchState.dist = dist;
+  }
+  e.preventDefault();
+},{passive:false});
+svg.addEventListener('touchend',()=>{
+  const wasPan = touchState && touchState.mode==='pan';
+  touchState=null;
+  if(wasPan) releaseWithInertia();
+  else updateLabelVisibility();
+});
+
+/* ---- 初期化 ---- */
+clampCamera();
+applyViewBox();
+</script>
+</body>
+</html>
