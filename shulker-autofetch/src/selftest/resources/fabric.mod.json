@@ -5,8 +5,8 @@
 	"name": "Shulker AutoFetch self test (dev only, not shipped)",
 	"environment": "*",
 	"entrypoints": {
-		"main": ["jp.shulkerfetch.selftest.SelfTestServer"],
-		"client": ["jp.shulkerfetch.selftest.SelfTestClient"]
+		"main": ["jp.shulkerfetch.selftest.SelfTestServer", "jp.shulkerfetch.selftest.DemoServer"],
+		"client": ["jp.shulkerfetch.selftest.SelfTestClient", "jp.shulkerfetch.selftest.DemoClient"]
 	},
 	"depends": { "shulkerfetch": "*" }
 }

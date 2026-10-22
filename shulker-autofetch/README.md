@@ -51,6 +51,8 @@ Litematica / MaLiLib はクライアント専用 Mod のため、専用サーバ
 ./gradlew build          # build/libs/shulker-autofetch-1.0.0.jar とユニットテスト
 ./gradlew test           # ユニットテストのみ
 ```
+動画の収録手順(開発用): `./gradlew runServer -Pdemo` の後に `xvfb-run ./gradlew runClient -Pdemo`(`src/selftest` の `DemoServer` / `DemoClient`)。
+
 結合テストの再現(開発用・JAR には含まれません): `src/selftest` のドライバ Mod を使い、`./gradlew runServer`(`run/` に `eula.txt` と `server.properties`(`server-port=25599`, `online-mode=false`)を用意)の後、`xvfb-run ./gradlew runClient` で自動接続・シナリオ実行され、ログに `SELFTEST` が出ます。
 
 JDK 17 以上 / Gradle 8.14.3(wrapper 同梱) / Fabric Loom 1.11.8。完成 JAR は `dist/` にも置いています。
@@ -96,11 +98,12 @@ Mixin(`shulkerfetch.mixins.json`、`defaultRequire: 1` で適用失敗は起動�
 | 同期の一致 | 最終状態のサーバー側ダンプとクライアント側ダンプが完全一致(全スロットとシュルカー内訳) |
 | 重複・ループ | 既に所持→要求0件。存在しないアイテムの連続呼び出し→スキャン1回のみ。呼び出し元不明→無視。3シナリオで要求ちょうど3件 |
 
+| 設計図(実物の Litematica 配置)を使ったデモ収録 | 設計図ブロックを視線で指し、Litematica 本来のルーチン(`doSchematicWorldPickBlock(true)` = 中ボタン既定の経路、`handleEasyPlace`)を呼んで、ホイールクリックの取得、Easy Place での石・ガラス・木材・ハーフブロック(Slabs only)の取得と **実際のブロック設置**、レンガ取得、満杯時の通知、存在しない場合の無動作、設定画面を確認(`video/shulker-autofetch-demo.mp4`) |
+
 **未検証(実施できていません)**
 
-- 設計図ブロックを実際に視線で指しての **本物のホイールクリック入力 / Easy Place 設置入力**(設計図のロードと入力操作は自動化しておらず、Litematica の選択ルーチンを直接呼んで検証)。
-  Easy Place は取得待ちの1回目の設置が `FAIL`(警告表示)になり、取得後の次の押下(押しっぱなしなら次tick)で設置されます。
-- 取得後の **実際の設置完了**(ブロックが置かれるところまで)。
+- **物理的なマウス/キーボード入力**(中ボタン・使用キーの実押下)。上記のとおり Litematica のルーチンは実物を呼んでいますが、キー入力イベント自体は自動化していません。
+- Easy Place は取得待ちの1回目の設置が `FAIL`(警告表示)になり、取得後の次の押下(押しっぱなしなら次tick)で設置されます(デモでは自動で繰り返し呼んでいます)。
 - **インベントリ満杯 / 取り込み中(別画面)/ クールダウン** をサーバー上で実機確認すること(満杯・消失なしはユニットテストのみ)。
 - **Mod 未導入サーバー / 版数不一致** の実機確認(コードは実装済み、実行していません)。
 - 複数人同時接続、Carpet 等の他サーバー Mod、他の Litematica 派生/アドオンとの併用。

@@ -60,6 +60,9 @@ public class SelfTestClient implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
+		if (Boolean.getBoolean("shulkerfetch.demo")) {
+			return;
+		}
 		ClientTickEvents.END_CLIENT_TICK.register(mc -> {
 			if (mc.player == null || mc.world == null) {
 				ticksInWorld = 0;

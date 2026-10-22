@@ -30,6 +30,9 @@ public class SelfTestServer implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+		if (Boolean.getBoolean("shulkerfetch.demo")) {
+			return;
+		}
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			ServerPlayerEntity p = handler.player;
 			p.getInventory().clear();
