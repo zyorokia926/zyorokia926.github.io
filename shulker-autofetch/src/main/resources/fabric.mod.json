@@ -6,6 +6,7 @@
 	"description": "Litematica addon: takes items needed by Easy Place / pick block out of shulker boxes in your inventory. Install on the client AND the server.",
 	"authors": ["shulkerfetch"],
 	"license": "LGPL-3.0-or-later",
+	"icon": "assets/shulkerfetch/icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": ["jp.shulkerfetch.common.ShulkerFetchMod"],
