@@ -100,7 +100,7 @@ public final class ServerFetchHandler {
 		lastAccepted.put(player.getUuid(), now);
 
 		PlayerInventory inv = player.getInventory();
-		Result result = FetchTransaction.run(inv, requested);
+		Result result = FetchTransaction.run(inv, requested, inv.selectedSlot);
 		if (result.status() == Status.OK) {
 			inv.markDirty();
 			player.playerScreenHandler.sendContentUpdates();

@@ -76,7 +76,7 @@ public final class FetchController {
 			block(stack);
 			return false; // let Litematica do what it would do without this mod
 		}
-		if (ShulkerInventory.findEmptySlot(inv) < 0) {
+		if (!inv.getMainHandStack().isEmpty() && ShulkerInventory.findEmptySlot(inv) < 0) {
 			block(stack);
 			say(Status.INVENTORY_FULL);
 			return false;
