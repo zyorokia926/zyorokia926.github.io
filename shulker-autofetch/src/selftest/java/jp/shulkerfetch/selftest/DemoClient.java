@@ -299,9 +299,56 @@ public class DemoClient implements ClientModInitializer {
 		m.pop();
 	}
 
+	/** Real-input test: this harness only builds the scene and aims; a separate process sends real mouse events. */
+	private void realInput() {
+		ClientTickEvents.END_CLIENT_TICK.register(mc -> {
+			if (mc.player == null || mc.world == null) {
+				return;
+			}
+			mc.getToastManager().clear();
+			int t = ++worldTicks;
+			if (t == 80) {
+				send(0);
+			} else if (t == 140) {
+				buildSchematic(mc);
+				mc.options.getGuiScale().setValue(2);
+			} else if (t == 260) {
+				lookAt(mc, 0, 0);
+				System.out.println("DEMOLOG READY");
+			}
+			if (t > 260 && t % 4 == 0) {
+				try {
+					java.nio.file.Path f = java.nio.file.Path.of("/tmp/demo/aim.txt");
+					if (java.nio.file.Files.exists(f)) {
+						for (String line : java.nio.file.Files.readAllLines(f)) {
+							String[] k = line.trim().split(" ");
+							if (k[0].equals("aim")) {
+								lookAt(mc, Integer.parseInt(k[1]), Integer.parseInt(k[2]));
+							} else if (k[0].equals("easy")) {
+								Configs.Generic.EASY_PLACE_MODE.setBooleanValue(k[1].equals("on"));
+								Configs.Generic.PLACEMENT_RESTRICTION_WARN.setOptionListValue(fi.dy.masa.malilib.util.MessageOutputType.NONE);
+							}
+						}
+					}
+				} catch (java.io.IOException e) {
+					// ignore
+				}
+			}
+			if (t > 260 && t % 10 == 0) {
+				System.out.println("DEMOLOG state hand=" + mc.player.getMainHandStack() + " selected=" + mc.player.getInventory().selectedSlot
+						+ " glass(1,1)=" + mc.world.getBlockState(origin.add(1, 1, 0)).getBlock()
+						+ " stone(0,0)=" + mc.world.getBlockState(origin.add(0, 0, 0)).getBlock());
+			}
+		});
+	}
+
 	@Override
 	public void onInitializeClient() {
-		if (!Boolean.getBoolean("shulkerfetch.demo")) {
+		if (Boolean.getBoolean("shulkerfetch.realinput")) {
+			realInput();
+			return;
+		}
+		if (!Boolean.getBoolean("shulkerfetch.demo") || Boolean.getBoolean("shulkerfetch.idle")) {
 			return;
 		}
 		HudRenderCallback.EVENT.register((m, delta) -> drawCaption(m));

@@ -28,22 +28,26 @@ Litematica / MaLiLib はクライアント専用 Mod のため、専用サーバ
 サーバー設定: `config/shulkerfetch-server.json`(初回起動で生成)
 `enabled`(全体の有効/無効), `cooldownTicks`(同一プレイヤーの最小要求間隔、既定 2)
 
-## 設定(クライアント)。なお失敗時の画面通知(アクションバー表示)は行いません。デバッグログのみ。
+## 設定(クライアント)
 
-ホットキー **M + S**(変更可)で MaLiLib 画面が開きます。ファイルは `config/shulkerfetch.json`。
+表示言語は日本語・英語(ゲームの言語設定に従う)。ホットキー **M + F**(変更可)で MaLiLib 設定画面が開きます。ファイルは `config/shulkerfetch.json`。
+各ON/OFF設定には専用のトグルホットキーがあり、実行すると masa 系 Mod と同じように **ホットバーの上に通知** が出ます
+(例: 「Shulker AutoFetch: Mod全体 を OFF にしました」/ "Shulker AutoFetch: Mod enabled is now OFF")。
+失敗時(見つからない・満杯など)の画面通知は行いません(デバッグログのみ)。
 
-| 設定 | 既定 | 内容 |
-|---|---|---|
-| enabled | true | Mod 全体 |
-| proPlaceIntegration | true | Easy Place が精密設置プロトコル(V3 / V2 / Slabs only)で動作中の取得 |
-| easyPlaceIntegration | true | Easy Place 設置時の取得 |
-| wheelClickFetch | true | ホイールクリック / Pick Block ホットキー時の取得 |
-| debugLog | false | デバッグログ |
+| 設定(名前) | 既定 | トグルホットキー(既定) | 内容 |
+|---|---|---|---|
+| shulkerFetchEnabled | true | M + T | Mod 全体 |
+| shulkerFetchProPlace | true | なし | Easy Place が精密設置プロトコル(V3 / V2 / Slabs only)で動作中の取得 |
+| shulkerFetchEasyPlace | true | なし | Easy Place 設置時の取得 |
+| shulkerFetchWheelClick | true | なし | ホイールクリック / Pick Block ホットキー時の取得 |
+| shulkerFetchDebugLog | false | なし | デバッグログ |
+| shulkerFetchOpenGui | — | M + F | 設定画面を開く |
 
-> **「ProPlace」について(要確認)**: Litematica 0.14.7 の JAR 内に `ProPlace` という名称は存在せず、Modrinth にも 1.19.4 向けの同名 Mod は見つかりませんでした
-> (「Pro Placer」は 1.20.1 以降のみ)。そのため本 Mod では **Easy Place の「精密設置プロトコル(Easy Place Protocol: V3/V2/Slabs only)」経路を ProPlace 相当**として扱い、
-> そのトグルを `proPlaceIntegration` としています。別の機能を指していた場合はお知らせください。
-> 取得処理自体は Easy Place・ホイールクリックが共通で通る1か所(下記)にあるため、Easy Place のプロトコル設定に関わらず動作します。
+(Litematica の既定ホットキー M+A / M+C / M+P / M+R / M+S とは重ならない組み合わせです。)
+
+> **ProPlace について**: 本 Mod では ProPlace = Litematica の Easy Place の「精密設置プロトコル(Easy Place Protocol: V3/V2/Slabs only)」です。
+> そのトグルが `shulkerFetchProPlace` です。取得処理自体は Easy Place・ホイールクリックが共通で通る1か所(下記)にあります。
 
 ## ビルド
 
@@ -98,11 +102,12 @@ Mixin(`shulkerfetch.mixins.json`、`defaultRequire: 1` で適用失敗は起動�
 | 同期の一致 | 最終状態のサーバー側ダンプとクライアント側ダンプが完全一致(全スロットとシュルカー内訳) |
 | 重複・ループ | 既に所持→要求0件。存在しないアイテムの連続呼び出し→スキャン1回のみ。呼び出し元不明→無視。3シナリオで要求ちょうど3件 |
 
+| 実入力テスト(X11 の実イベント、xdotool) | 中ボタンクリックで手持ちのリンゴが石64(最大スタック)に変わる / 右クリック長押しの Easy Place でガラスが取得され実際に設置される / M+T でホットバー上に日本語・英語の通知 / M+F で設定画面(日本語・英語)が開く |
 | 設計図(実物の Litematica 配置)を使ったデモ収録 | 設計図ブロックを視線で指し、Litematica 本来のルーチン(`doSchematicWorldPickBlock(true)` = 中ボタン既定の経路、`handleEasyPlace`)を呼んで、ホイールクリックの取得、Easy Place での石・ガラス・木材・ハーフブロック(Slabs only)の取得と **実際のブロック設置**、レンガ取得、満杯時の無動作、存在しない場合の無動作、設定画面を確認(`video/shulker-autofetch-feature-explained.mp4`) |
 
 **未検証(実施できていません)**
 
-- **物理的なマウス/キーボード入力**(中ボタン・使用キーの実押下)。上記のとおり Litematica のルーチンは実物を呼んでいますが、キー入力イベント自体は自動化していません。
+- 物理ハードウェアのマウス/キーボード(X11 の実イベント(xdotool)では中ボタン・右クリック長押し・M+T / M+F を確認済み)。
 - Easy Place は取得待ちの1回目の設置が `FAIL`(警告表示)になり、取得後の次の押下(押しっぱなしなら次tick)で設置されます(デモでは自動で繰り返し呼んでいます)。
 - **インベントリ満杯 / 取り込み中(別画面)/ クールダウン** をサーバー上で実機確認すること(満杯・消失なしはユニットテストのみ)。
 - **Mod 未導入サーバー / 版数不一致** の実機確認(コードは実装済み、実行していません)。

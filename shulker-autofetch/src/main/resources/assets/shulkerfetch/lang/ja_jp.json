@@ -1,4 +1,24 @@
 {
-	"shulkerfetch.gui.title": "Shulker AutoFetch",
-	"shulkerfetch.hotkeys.category": "Shulker AutoFetch"
+	"shulkerfetch.gui.title": "Shulker AutoFetch 設定",
+	"shulkerfetch.hotkeys.category": "Shulker AutoFetch",
+	"shulkerfetch.message.toggled": "Shulker AutoFetch: %s を %s にしました",
+	"shulkerfetch.message.value.on": "ON",
+	"shulkerfetch.message.value.off": "OFF",
+	"config.name.shulkerfetchopengui": "設定画面を開く",
+	"config.comment.shulkerfetchopengui": "Shulker AutoFetch の設定画面を開くホットキーです。",
+	"shulkerfetch.config.pretty.enabled": "Mod全体",
+	"config.name.shulkerfetchenabled": "Mod全体",
+	"config.comment.shulkerfetchenabled": "このModの機能全体を有効/無効にします。",
+	"shulkerfetch.config.pretty.pro_place": "ProPlace連携",
+	"config.name.shulkerfetchproplace": "ProPlace連携",
+	"config.comment.shulkerfetchproplace": "Easy Place が精密設置プロトコル (V3 / V2 / Slabs only) で動作しているときも、シュルカーボックスから取得します。",
+	"shulkerfetch.config.pretty.easy_place": "Easy Place連携",
+	"config.name.shulkerfetcheasyplace": "Easy Place連携",
+	"config.comment.shulkerfetcheasyplace": "Litematica の Easy Place で必要なアイテムが無いとき、シュルカーボックスから取得します。",
+	"shulkerfetch.config.pretty.wheel_click": "ホイールクリック取得",
+	"config.name.shulkerfetchwheelclick": "ホイールクリック取得",
+	"config.comment.shulkerfetchwheelclick": "設計図ブロックのホイールクリック(Pick Block)で必要なアイテムが無いとき、シュルカーボックスから取得します。",
+	"shulkerfetch.config.pretty.debug_log": "デバッグログ",
+	"config.name.shulkerfetchdebuglog": "デバッグログ",
+	"config.comment.shulkerfetchdebuglog": "取得処理の動作をゲームのログに出力します。"
 }

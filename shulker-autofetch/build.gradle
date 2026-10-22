@@ -50,10 +50,11 @@ loom {
 		server {
 			source sourceSets.selftest
 			if (project.hasProperty('demo')) vmArg '-Dshulkerfetch.demo=true'
+			if (project.hasProperty('realinput')) vmArg '-Dshulkerfetch.realinput=true'
 		}
 		client {
 			source sourceSets.selftest
-			if (project.hasProperty('demo')) { vmArg '-Dshulkerfetch.demo=true'; if (project.hasProperty('nocaption')) vmArg '-Dshulkerfetch.nocaption=true'; programArgs '--width', '1280', '--height', '720' }
+			if (project.hasProperty('demo')) { vmArg '-Dshulkerfetch.demo=true'; if (project.hasProperty('realinput')) vmArg '-Dshulkerfetch.realinput=true'; if (project.hasProperty('idle')) vmArg '-Dshulkerfetch.idle=true'; if (project.hasProperty('nocaption')) vmArg '-Dshulkerfetch.nocaption=true'; programArgs '--width', '1280', '--height', '720' }
 			programArgs '--server', 'localhost', '--port', '25599', '--username', 'TestBot'
 		}
 	}

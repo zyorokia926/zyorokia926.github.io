@@ -55,17 +55,17 @@ F5. 即時反映
 
 F6. ホイールクリック対応
   経路   : WorldUtils.doSchematicWorldPickBlock → InventoryUtils.schematicWorldPickBlock
-  設定   : wheelClickFetch で有効/無効。
+  設定   : shulkerFetchWheelClick で有効/無効。
 
 F7. Easy Place 対応
   経路   : WorldUtils.doEasyPlaceAction → InventoryUtils.schematicWorldPickBlock
   動作   : 使用キーを押し続けると、足りないブロックがその都度箱から補充され、そのまま設置される。
-  設定   : easyPlaceIntegration で有効/無効。
+  設定   : shulkerFetchEasyPlace で有効/無効。
 
 F8. ProPlace(精密設置プロトコル)対応
   動作   : Easy Place が精密設置プロトコル(V3 / V2 / Slabs only)で動作しているときも、F7 と同様に取得する。
-  設定   : proPlaceIntegration で有効/無効。精密設置プロトコル使用中は easyPlaceIntegration と proPlaceIntegration の両方が必要。
-           プロトコルが None のときは easyPlaceIntegration のみで判定。
+  設定   : shulkerFetchProPlace で有効/無効。精密設置プロトコル使用中は shulkerFetchEasyPlace と shulkerFetchProPlace の両方が必要。
+           プロトコルが None のときは shulkerFetchEasyPlace のみで判定。
 
 F9. サーバーによる検証と同期
   サーバーは要求を受けるたびに次を確認し、すべて満たしたときだけ実行する。
@@ -86,17 +86,21 @@ F10. 処理負荷への配慮
   - 未応答の要求は最大4件、100tick で打ち切り。
   - サーバー側は1要求につき1回の取り出しのみ。
 
-F11. 失敗時の挙動(画面通知なし)
+F11. 失敗時の挙動(失敗の画面通知なし。ホットキー実行時の通知は F12)
   対象のアイテムがどこにも無い / 満杯 / サーバーが拒否 / 応答なし / サーバー未導入・版数不一致 のときは、
   何も起こさず Litematica の標準動作に任せる。画面への通知表示はしない(デバッグログのみ)。
 
-F12. 設定
-  クライアント(MaLiLib 画面。既定ホットキー M + S。ファイル config/shulkerfetch.json)
-    enabled               Mod 全体の有効/無効            (既定 true)
-    proPlaceIntegration   精密設置プロトコル使用時の取得 (既定 true)
-    easyPlaceIntegration  Easy Place 時の取得             (既定 true)
-    wheelClickFetch       ホイールクリック時の取得        (既定 true)
-    debugLog              デバッグログ                    (既定 false)
+F12. 設定・言語・ホットキー
+  表示言語   : 日本語・英語(ゲームの言語設定に従う)。設定名・説明・通知はすべて両言語に対応。
+  クライアント(MaLiLib 画面。ホットキー M + F で開く。ファイル config/shulkerfetch.json)
+    shulkerFetchEnabled     Mod 全体の有効/無効                (既定 true , トグル M + T)
+    shulkerFetchProPlace    精密設置プロトコル使用時の取得     (既定 true , トグル なし)
+    shulkerFetchEasyPlace   Easy Place 時の取得                (既定 true , トグル なし)
+    shulkerFetchWheelClick  ホイールクリック時の取得           (既定 true , トグル なし)
+    shulkerFetchDebugLog    デバッグログ                       (既定 false, トグル なし)
+    shulkerFetchOpenGui     設定画面を開く                     (ホットキー M + F)
+  トグルホットキー: 各ON/OFF設定に割り当て可能。実行すると、Litematica 等の masa 系 Mod と同じように
+                    ホットバーの上に「Shulker AutoFetch: 〇〇 を ON/OFF にしました」と通知が出る(ON=緑、OFF=赤)。
   サーバー(config/shulkerfetch-server.json)
     enabled               サーバーでの有効/無効           (既定 true)
     cooldownTicks         同一プレイヤーの最小要求間隔    (既定 2、範囲 1〜200)
@@ -119,7 +123,7 @@ F14. 未導入・版数不一致
   D. ProPlace: プロトコルを Slabs only にして、上半分のハーフブロックも同様に取得・設置。
   E. 見つからない: ダイヤブロックなど、インベントリにも箱にも無い → 何も起きない。
   F. 満杯: 36枠すべて埋まり退避できない → 何も起きない(失われない)。空きを作って再度クリックすると取得される。
-  G. 設定オフ: wheelClickFetch をオフ → 箱から取得されない。オンに戻すと取得される。
+  G. 設定オフ: shulkerFetchWheelClick をオフ → 箱から取得されない。オンに戻すと取得される。
 
 5. 内部構成
 -----------
@@ -134,7 +138,9 @@ F14. 未導入・版数不一致
   実施済み: クリーンビルド、ユニットテスト17件、専用サーバー起動、実クライアント(Litematica / MaLiLib 実物)+専用サーバーでの
             Mixin 適用(エラー0)、同tickでの手持ち枠配置、最大スタック優先、インベントリ優先、Easy Place での取得と実設置、
             Slabs only、見つからない / 満杯 / 設定オフの無動作、同一tickの2要求でのサーバー拒否と巻き戻し(最終状態の一致)。
-  未検証  : 物理的なマウス/キーボード入力(中ボタン・使用キーの実押下)、Mod未導入サーバー・版数不一致の実機確認、複数人同時接続、
+  追加実施: X11 の実イベント(xdotool)による入力で、中ボタンクリック(手持ちが石64に変わる)、右クリック長押しの Easy Place(ガラスを取得して実設置)、
+            M + T の通知(日本語・英語)、M + F の設定画面(日本語・英語)を確認。
+  未検証  : 物理ハードウェアの入力そのもの、Mod未導入サーバー・版数不一致の実機確認、複数人同時接続、
             他 Mod との併用、通常の Fabric ランチャー(intermediary)での起動。
 
 7. 既知の制限

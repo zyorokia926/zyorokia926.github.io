@@ -44,7 +44,7 @@ public class DemoServer implements ModInitializer {
 		inv.clear();
 		inv.main.set(9, box(Items.BLUE_SHULKER_BOX, new ItemStack(Items.STONE, 64), new ItemStack(Items.STONE, 30), new ItemStack(Items.GLASS, 16)));
 		inv.main.set(10, box(Items.RED_SHULKER_BOX, new ItemStack(Items.OAK_PLANKS, 32), new ItemStack(Items.OAK_SLAB, 16), new ItemStack(Items.BRICKS, 20), new ItemStack(Items.SAND, 20)));
-		inv.main.set(4, new ItemStack(Items.STICK, 5));
+		inv.main.set(4, new ItemStack(Boolean.getBoolean("shulkerfetch.realinput") ? Items.APPLE : Items.STICK, 5));
 		inv.selectedSlot = 4;
 		p.networkHandler.sendPacket(new UpdateSelectedSlotS2CPacket(4));
 	}

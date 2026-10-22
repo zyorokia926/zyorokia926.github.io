@@ -17,7 +17,7 @@ Litematica の **ホイールクリック(Pick Block)** と **Easy Place**(精�
 
 ## 3. 機能仕様
 ### 3.1 発動条件(すべて満たすとき)
-1. Mod 有効、かつ呼び出し元の設定が有効(ホイールクリック=`wheelClickFetch`、Easy Place=`easyPlaceIntegration`、精密設置プロトコル使用中は加えて `proPlaceIntegration`)。
+1. Mod 有効、かつ呼び出し元の設定が有効(ホイールクリック=`shulkerFetchWheelClick`、Easy Place=`shulkerFetchEasyPlace`、精密設置プロトコル使用中は加えて `shulkerFetchProPlace`)。
 2. サバイバル/アドベンチャー(クリエイティブ・観戦では何もしない)。
 3. 必要アイテム(アイテム+NBT 一致 `ItemStack.canCombine`)がメインインベントリ36枠に無い。所持していれば**何もせず**Litematica 標準動作。
 4. メインインベントリのシュルカーボックス(全色)の中に該当アイテムがある。
@@ -52,8 +52,9 @@ Litematica の **ホイールクリック(Pick Block)** と **Easy Place**(精�
 `hello` 未受信・版数不一致・サーバー未導入時は要求を送らずログに警告のみ(画面通知なし)、切断/参加時に状態をリセット。
 
 ## 5. 設定
-クライアント(MaLiLib、ホットキー **M+S** で画面、`config/shulkerfetch.json`):
-`enabled`(true) / `proPlaceIntegration`(true) / `easyPlaceIntegration`(true) / `wheelClickFetch`(true) / `debugLog`(false)
+クライアント(MaLiLib、ホットキー **M+F** で画面、`config/shulkerfetch.json`、日本語・英語対応):
+`shulkerFetchEnabled`(true, トグル M+T) / `shulkerFetchProPlace`(true) / `shulkerFetchEasyPlace`(true) / `shulkerFetchWheelClick`(true) / `shulkerFetchDebugLog`(false)
+各ON/OFF設定にトグルホットキーを割り当て可能。実行するとホットバーの上に通知(masa系Modと同様)。失敗時の画面通知はなし。
 
 サーバー(`config/shulkerfetch-server.json`): `enabled`(true) / `cooldownTicks`(5)
 
@@ -67,7 +68,9 @@ Mixin 適用(エラー0)・先行適用(同tickで手持ち枠に入る)→要�
 
 **追加で実施済み**: 実物の Litematica 配置(設計図)に対し、Litematica 本来のルーチン(中ボタン既定経路 `doSchematicWorldPickBlock(true)`、`handleEasyPlace`)で、ホイールクリック取得・Easy Place 取得と実ブロック設置・Slabs only・満杯時通知・存在しない場合の無動作・設定画面を収録確認(video/shulker-autofetch-feature-explained.mp4)。
 
-**未検証**: 物理的なマウス/キーボード入力イベント(中ボタン・使用キーの実押下)、満杯・別画面・クールダウンの実機確認、
+**追加で実施済み**: X11 の実イベント(xdotool)で中ボタン・右クリック長押し・M+T・M+F を入力し、取得・設置・通知・設定画面(日本語・英語)を確認。
+
+**未検証**: 物理ハードウェアの入力そのもの、満杯・別画面・クールダウンの実機確認、
 Mod未導入サーバー/版数不一致の実機確認、複数人同時接続、他 Mod との併用、通常の Fabric ランチャー(intermediary)での起動。
 
 ## 8. 既知の制限
