@@ -53,7 +53,7 @@ loom {
 		}
 		client {
 			source sourceSets.selftest
-			if (project.hasProperty('demo')) { vmArg '-Dshulkerfetch.demo=true'; programArgs '--width', '1280', '--height', '720' }
+			if (project.hasProperty('demo')) { vmArg '-Dshulkerfetch.demo=true'; if (project.hasProperty('nocaption')) vmArg '-Dshulkerfetch.nocaption=true'; programArgs '--width', '1280', '--height', '720' }
 			programArgs '--server', 'localhost', '--port', '25599', '--username', 'TestBot'
 		}
 	}

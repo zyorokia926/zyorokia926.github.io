@@ -38,7 +38,7 @@ import net.minecraft.util.math.Vec3d;
 
 /** Dev-only: scripted tour of the mod for the explanation video. Drives the real Litematica routines. */
 public class DemoClient implements ClientModInitializer {
-	private record Step(int delay, Runnable action) {
+	private record Step(int delay, Runnable action, java.util.function.BooleanSupplier gate) {
 	}
 
 	private final List<Step> steps = new ArrayList<>();
@@ -53,7 +53,19 @@ public class DemoClient implements ClientModInitializer {
 	private BlockPos origin = new BlockPos(-2, -60, 4);
 
 	private void then(int delay, Runnable r) {
-		steps.add(new Step(delay, r));
+		steps.add(new Step(delay, r, null));
+	}
+
+	private final double[] narrSec = new double[32];
+	private long narrFreeAt;
+
+	/** Starts narration clip i as soon as the previous clip has finished; logs the wall-clock start for the audio mix. */
+	private void narrate(int i) {
+		steps.add(new Step(0, () -> {
+			long now = System.currentTimeMillis();
+			System.out.println("DEMOMARK say " + i + " " + now);
+			narrFreeAt = now + (long) (narrSec[i] * 1000) + 600;
+		}, () -> System.currentTimeMillis() >= narrFreeAt));
 	}
 
 	private void say(String text) {
@@ -148,33 +160,42 @@ public class DemoClient implements ClientModInitializer {
 	}
 
 	private void script(MinecraftClient mc) {
+		try {
+			for (String line : java.nio.file.Files.readAllLines(java.nio.file.Path.of(System.getProperty("shulkerfetch.narr", "/tmp/demo/narr/durations.txt")))) {
+				String[] kv = line.trim().split(" ");
+				if (kv.length == 2) {
+					narrSec[Integer.parseInt(kv[0])] = Double.parseDouble(kv[1]);
+				}
+			}
+		} catch (java.io.IOException e) {
+			throw new IllegalStateException(e);
+		}
 		card("Shulker AutoFetch", "Litematica 用:シュルカーボックスから自動でアイテム取得", "Minecraft 1.19.4 / Fabric");
-		then(140, () -> { });
+		narrate(0);
+		steps.add(new Step(0, () -> { }, () -> System.currentTimeMillis() >= narrFreeAt));
 		card("対応する操作", "・設計図ブロックへのホイールクリック (Pick Block)", "・Easy Place", "・Easy Place の精密設置プロトコル (ProPlace)");
-		then(160, () -> { });
+		narrate(1);
+		steps.add(new Step(0, () -> { }, () -> System.currentTimeMillis() >= narrFreeAt));
 		noCard();
 		then(0, () -> send(0));
 		then(60, () -> buildSchematic(mc));
-		then(120, () -> { });
-		say("目の前の半透明ブロックが Litematica の設計図です。壁は 石・ガラス・木材・ハーフブロック・レンガ・ダイヤブロックでできています。");
-		then(140, () -> { });
-		say("手に持っているのはスティック(ホットバー5番)。インベントリを開いてみます。");
-		then(60, () -> mc.setScreen(new InventoryScreen(mc.player)));
-		then(30, () -> hoverSlot(mc, 9));
-		say("青いシュルカーボックスの中身: 石 64 + 30、ガラス 16。石もガラスもインベントリの直下には無く、箱の中だけにあります。");
-		then(150, () -> hoverSlot(mc, 10));
-		say("赤いシュルカーボックスの中身: 木材 32、ハーフブロック 16、レンガ 20。");
-		then(150, () -> mc.setScreen(null));
-		say("① ホイールクリック。石のブロックを見て、通常どおり設計図ブロックをホイールクリックします。");
+		then(100, () -> { });
+		narrate(2);
+		narrate(3);
+		then(30, () -> mc.setScreen(new InventoryScreen(mc.player)));
+		then(40, () -> hoverSlot(mc, 9));
+		narrate(4);
+		then(5, () -> hoverSlot(mc, 10));
+		narrate(5);
+		then(0, () -> mc.setScreen(null));
 		then(40, () -> lookAt(mc, 0, 0));
-		then(80, () -> { });
+		then(60, () -> { });
 		then(0, () -> wheel(mc));
-		say("石がシュルカーボックスから取り出され、今持っている枠に入りました。スティックは空いているインベントリのスロットへ退避されます。");
-		then(120, () -> mc.setScreen(new InventoryScreen(mc.player)));
+		narrate(6);
+		then(40, () -> mc.setScreen(new InventoryScreen(mc.player)));
 		then(20, () -> hoverSlot(mc, 4));
-		say("ホットバー5番に石(30)。スティックは空きスロットへ。青い箱の中身は石 64 とガラス 16 に減っています(小さいスタックから先に取り出します)。");
-		then(160, () -> mc.setScreen(null));
-		say("② Easy Place。使用キーを押し続けると、足りないアイテムがその都度シュルカーから補充されます。まず石を置きます。");
+		narrate(7);
+		then(0, () -> mc.setScreen(null));
 		then(0, () -> {
 			Configs.Generic.EASY_PLACE_MODE.setBooleanValue(true);
 			Configs.Generic.PLACEMENT_RESTRICTION_WARN.setOptionListValue(fi.dy.masa.malilib.util.MessageOutputType.NONE);
@@ -182,43 +203,37 @@ public class DemoClient implements ClientModInitializer {
 		then(20, () -> { });
 		easyPlace(mc, 0, 0, 30);
 		easyPlace(mc, 1, 0, 30);
-		say("次はガラス。手持ちに無いので、シュルカーからガラスが取り出されて手に持たれ、そのまま設置されます。");
+		narrate(8);
 		easyPlace(mc, 1, 1, 50);
 		easyPlace(mc, 2, 1, 40);
-		say("木材も同様です。赤いシュルカーボックスから取り出されます。");
+		narrate(9);
 		easyPlace(mc, 0, 2, 50);
 		easyPlace(mc, 1, 2, 40);
-		then(60, () -> { });
-		say("③ ProPlace(精密設置プロトコル)。プロトコルを Slabs only にして、上半分のハーフブロックも同じように取得して設置します。");
+		narrate(10);
 		then(0, () -> Configs.Generic.EASY_PLACE_PROTOCOL.setOptionListValue(EasyPlaceProtocol.SLAB_ONLY));
 		easyPlace(mc, 1, 3, 70);
-		say("設置したハーフブロックは設計図どおり上半分です。");
-		then(80, () -> { });
-		say("④ 設計図に必要なアイテムがどこにも無い場合(ダイヤブロック)は、何もせず Litematica 標準の動作のままです。");
+		narrate(11);
 		then(40, () -> lookAt(mc, 2, 3));
 		then(40, () -> wheel(mc));
-		then(100, () -> { });
-		say("⑤ インベントリが満杯のときは、アイテムを捨てたり上書きしたりせず、中断して通知します。");
+		then(60, () -> { });
+		narrate(12);
 		then(0, () -> send(1));
 		then(40, () -> lookAt(mc, 0, 3));
 		then(20, () -> wheel(mc));
-		then(120, () -> { });
-		say("空きを作ってからもう一度ホイールクリックすると、レンガが取り出されます。");
-		then(0, () -> send(2));
-		then(40, () -> wheel(mc));
-		then(120, () -> { });
-		say("設定画面(ホットキー M+S)。Mod 全体 / ProPlace / Easy Place / ホイールクリック / デバッグログ を切り替えられます。");
+		then(120, () -> send(2));
+		then(60, () -> wheel(mc));
+		narrate(13);
 		then(20, () -> {
 			jp.shulkerfetch.client.config.FetchConfigs.DEBUG_LOG.setBooleanValue(false);
 			GuiBase.openGui(new FetchConfigGui());
 		});
-		then(180, () -> mc.setScreen(null));
-		noCard();
+		narrate(14);
+		then(0, () -> mc.setScreen(null));
 		card("導入", "クライアント: Litematica 0.14.x + MaLiLib 0.15.x + Fabric API + 本 Mod", "サーバー: Fabric API + 本 Mod(シングルプレイはクライアントのみ)", "サーバーに未導入だと取得は動きません");
-		then(200, () -> { });
-		card("仕様", "取り出しはサーバーが検証して実行(複製・消失なし)", "探索対象: インベントリ36枠内のシュルカーボックス", "手持ちの枠に必ず入る / 元のアイテムは空きスロットへ退避", "空きスロットが無いときは何もせず通知");
-		then(220, () -> { });
-		then(0, () -> {
+		narrate(15);
+		card("仕様", "取り出しはサーバーが検証して実行(複製・消失なし)", "探索対象: インベントリ36枠内のシュルカーボックス", "手持ちの枠に必ず入る / 元のアイテムは空きスロットへ退避", "空きスロットが無いときは何もせず終了");
+		steps.add(new Step(0, () -> { }, () -> System.currentTimeMillis() >= narrFreeAt));
+		then(40, () -> {
 			System.out.println("DEMOMARK end " + System.currentTimeMillis());
 			mc.scheduleStop();
 		});
@@ -242,7 +257,7 @@ public class DemoClient implements ClientModInitializer {
 			}
 			return;
 		}
-		if (caption.isEmpty()) {
+		if (caption.isEmpty() || Boolean.getBoolean("shulkerfetch.nocaption")) {
 			return;
 		}
 		float k = 1.5f;
@@ -285,28 +300,32 @@ public class DemoClient implements ClientModInitializer {
 				System.out.println("DEMOMARK start " + System.currentTimeMillis());
 				script(mc);
 			}
-			// A step's delay is the time to wait BEFORE its action runs.
+			// A step's delay is the time to wait BEFORE its action runs; gated steps wait for their gate.
 			while (true) {
-				if (wait > 0) {
-					wait--;
-					if (wait > 0) {
+				if (current != null) {
+					if (current.gate() != null) {
+						if (!current.gate().getAsBoolean()) {
+							return;
+						}
+					} else if (--wait > 0) {
 						return;
 					}
-					if (current != null) {
-						current.action().run();
-						current = null;
-					}
+					current.action().run();
+					current = null;
 				}
 				if (index >= steps.size()) {
 					return;
 				}
-				Step s = steps.get(index++);
-				if (s.delay() > 0) {
-					current = s;
-					wait = s.delay();
+				Step st = steps.get(index++);
+				if (st.gate() == null && st.delay() == 0) {
+					st.action().run();
+					continue;
+				}
+				current = st;
+				wait = st.delay();
+				if (st.gate() == null) {
 					return;
 				}
-				s.action().run();
 			}
 		});
 	}

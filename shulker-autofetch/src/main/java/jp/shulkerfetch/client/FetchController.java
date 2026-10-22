@@ -14,7 +14,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.PacketByteBuf;
-import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import org.slf4j.Logger;
@@ -78,13 +77,13 @@ public final class FetchController {
 		}
 		if (!inv.getMainHandStack().isEmpty() && ShulkerInventory.findEmptySlot(inv) < 0) {
 			block(stack);
-			say(Status.INVENTORY_FULL);
+			debug("no free slot to swap the held stack into");
 			return false;
 		}
 		if (!serverReady || !ClientPlayNetworking.canSend(Protocol.REQUEST)) {
 			if (!warnedServer) {
 				warnedServer = true;
-				mc.inGameHud.setOverlayMessage(Text.translatable("shulkerfetch.msg.no_server"), false);
+				LOGGER.warn("[shulkerfetch] the server does not have Shulker AutoFetch installed; fetching from shulker boxes is off");
 			}
 			block(stack);
 			return false;
@@ -129,7 +128,6 @@ public final class FetchController {
 		debug("response #{}: {} amount={} slot={}", id, status, amount, slot);
 		if (status != Status.OK && status != Status.ALREADY_AVAILABLE) {
 			block(p.stack());
-			say(status);
 			return;
 		}
 		World schematic = SchematicWorldHandler.getSchematicWorld();
@@ -153,7 +151,6 @@ public final class FetchController {
 			debug("request #{} timed out", pending.id());
 			block(pending.stack());
 			pending = null;
-			mc.inGameHud.setOverlayMessage(Text.translatable("shulkerfetch.msg.timeout"), false);
 		}
 	}
 
@@ -162,7 +159,6 @@ public final class FetchController {
 		warnedServer = false;
 		if (!serverReady) {
 			LOGGER.warn("Server has protocol {}, this client needs {}; shulker fetching disabled", serverVersion, Protocol.VERSION);
-			MinecraftClient.getInstance().inGameHud.setOverlayMessage(Text.translatable("shulkerfetch.msg.version_mismatch"), false);
 		}
 	}
 
@@ -182,18 +178,6 @@ public final class FetchController {
 	private static void block(ItemStack stack) {
 		blockedStack = stack.copy();
 		blockedUntil = tick + RETRY_COOLDOWN_TICKS;
-	}
-
-	private static void say(Status status) {
-		String key = switch (status) {
-			case NOT_FOUND -> "shulkerfetch.msg.not_found";
-			case INVENTORY_FULL -> "shulkerfetch.msg.inventory_full";
-			case BUSY -> "shulkerfetch.msg.busy";
-			case DISABLED -> "shulkerfetch.msg.server_disabled";
-			case PROTOCOL_MISMATCH -> "shulkerfetch.msg.version_mismatch";
-			default -> "shulkerfetch.msg.failed";
-		};
-		MinecraftClient.getInstance().inGameHud.setOverlayMessage(Text.translatable(key), false);
 	}
 
 	private static void debug(String msg, Object... args) {
