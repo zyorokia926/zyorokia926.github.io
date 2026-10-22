@@ -32,7 +32,7 @@ Litematica / MaLiLib はクライアント専用 Mod のため、専用サーバ
 
 表示言語は日本語・英語(ゲームの言語設定に従う)。ホットキー **M + F**(変更可)で MaLiLib 設定画面が開きます。ファイルは `config/shulkerfetch.json`。
 各ON/OFF設定には専用のトグルホットキーがあり、実行すると masa 系 Mod と同じように **ホットバーの上に通知** が出ます
-(例: 「Shulker AutoFetch: Mod全体 を OFF にしました」/ "Shulker AutoFetch: Mod enabled is now OFF")。
+(例: 「Shulker AutoFetch: Mod全体 を false にしました」/ "Shulker AutoFetch: Mod enabled is now false")。
 失敗時(見つからない・満杯など)の画面通知は行いません(デバッグログのみ)。
 
 | 設定(名前) | 既定 | トグルホットキー(既定) | 内容 |

@@ -100,7 +100,7 @@ F12. 設定・言語・ホットキー
     shulkerFetchDebugLog    デバッグログ                       (既定 false, トグル なし)
     shulkerFetchOpenGui     設定画面を開く                     (ホットキー M + F)
   トグルホットキー: 各ON/OFF設定に割り当て可能。実行すると、Litematica 等の masa 系 Mod と同じように
-                    ホットバーの上に「Shulker AutoFetch: 〇〇 を ON/OFF にしました」と通知が出る(ON=緑、OFF=赤)。
+                    ホットバーの上に「Shulker AutoFetch: 〇〇 を true/false にしました」と通知が出る(true=緑、false=赤)。
   サーバー(config/shulkerfetch-server.json)
     enabled               サーバーでの有効/無効           (既定 true)
     cooldownTicks         同一プレイヤーの最小要求間隔    (既定 2、範囲 1〜200)
