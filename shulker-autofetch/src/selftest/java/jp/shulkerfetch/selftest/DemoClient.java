@@ -137,7 +137,7 @@ public class DemoClient implements ClientModInitializer {
 		c.set(1, 3, 0, slabTop);
 		c.set(2, 3, 0, Blocks.DIAMOND_BLOCK.getDefaultState());
 		c.set(3, 3, 0, slabTop);
-		c.set(4, 3, 0, Blocks.BRICKS.getDefaultState());
+		c.set(4, 3, 0, Blocks.SAND.getDefaultState());
 		SchematicPlacement placement = SchematicPlacement.createFor(schematic, origin, "demo wall", true, true);
 		DataManager.getSchematicPlacementManager().addSchematicPlacement(placement, false);
 		DataManager.getSchematicPlacementManager().setSelectedSchematicPlacement(placement);
@@ -164,7 +164,7 @@ public class DemoClient implements ClientModInitializer {
 
 	private void script(MinecraftClient mc) {
 		try {
-			for (String line : java.nio.file.Files.readAllLines(java.nio.file.Path.of(System.getProperty("shulkerfetch.narr", "/tmp/demo/narr/durations.txt")))) {
+			for (String line : java.nio.file.Files.readAllLines(java.nio.file.Path.of(System.getProperty("shulkerfetch.narr", "/tmp/demo/narr2/durations.txt")))) {
 				String[] kv = line.trim().split(" ");
 				if (kv.length == 2) {
 					narrSec[Integer.parseInt(kv[0])] = Double.parseDouble(kv[1]);
@@ -177,23 +177,34 @@ public class DemoClient implements ClientModInitializer {
 		then(60, () -> buildSchematic(mc));
 		then(100, () -> System.out.println("DEMOMARK vstart " + System.currentTimeMillis()));
 		narrate(0);
-		steps.add(new Step(0, () -> { }, () -> System.currentTimeMillis() >= narrFreeAt));
+		then(0, () -> lookAt(mc, 2, 1));
 		narrate(1);
-		steps.add(new Step(0, () -> { }, () -> System.currentTimeMillis() >= narrFreeAt));
+		// 2: what is in the inventory
 		narrate(2);
-		narrate(3);
 		then(30, () -> mc.setScreen(new InventoryScreen(mc.player)));
 		then(40, () -> hoverSlot(mc, 9));
+		then(150, () -> hoverSlot(mc, 10));
+		// 3: inventory first (glass outside the box)
+		narrate(3);
+		then(0, () -> mc.setScreen(null));
+		then(0, () -> send(3));
+		then(40, () -> lookAt(mc, 1, 1));
+		then(60, () -> wheel(mc));
 		narrate(4);
-		then(5, () -> hoverSlot(mc, 10));
+		then(40, () -> mc.setScreen(new InventoryScreen(mc.player)));
+		then(20, () -> hoverSlot(mc, 9));
+		// 5: largest stack first
 		narrate(5);
 		then(0, () -> mc.setScreen(null));
-		then(40, () -> lookAt(mc, 0, 0));
+		then(0, () -> send(4));
+		then(60, () -> lookAt(mc, 0, 0));
 		then(60, () -> { });
 		then(0, () -> wheel(mc));
 		narrate(6);
-		then(40, () -> mc.setScreen(new InventoryScreen(mc.player)));
+		then(60, () -> mc.setScreen(new InventoryScreen(mc.player)));
 		then(20, () -> hoverSlot(mc, 4));
+		then(200, () -> hoverSlot(mc, 9));
+		// 7: easy place
 		narrate(7);
 		then(0, () -> mc.setScreen(null));
 		then(0, () -> {
@@ -203,35 +214,48 @@ public class DemoClient implements ClientModInitializer {
 		then(20, () -> { });
 		easyPlace(mc, 0, 0, 30);
 		easyPlace(mc, 1, 0, 30);
-		narrate(8);
 		easyPlace(mc, 1, 1, 50);
 		easyPlace(mc, 2, 1, 40);
-		narrate(9);
 		easyPlace(mc, 0, 2, 50);
 		easyPlace(mc, 1, 2, 40);
-		narrate(10);
+		// 8: held slot + displaced item
+		narrate(8);
+		then(20, () -> mc.setScreen(new InventoryScreen(mc.player)));
+		then(20, () -> hoverSlot(mc, 4));
+		// 9: ProPlace
+		narrate(9);
+		then(0, () -> mc.setScreen(null));
 		then(0, () -> Configs.Generic.EASY_PLACE_PROTOCOL.setOptionListValue(EasyPlaceProtocol.SLAB_ONLY));
 		easyPlace(mc, 1, 3, 70);
-		narrate(11);
+		// 10: nothing anywhere
+		narrate(10);
 		then(40, () -> lookAt(mc, 2, 3));
 		then(40, () -> wheel(mc));
-		then(60, () -> { });
-		narrate(12);
+		then(40, () -> { });
+		// 11: full inventory
+		narrate(11);
 		then(0, () -> send(1));
 		then(40, () -> lookAt(mc, 0, 3));
 		then(20, () -> wheel(mc));
 		then(120, () -> send(2));
 		then(60, () -> wheel(mc));
-		narrate(13);
+		// 12: settings, wheel click off
+		narrate(12);
 		then(20, () -> {
 			jp.shulkerfetch.client.config.FetchConfigs.DEBUG_LOG.setBooleanValue(false);
 			GuiBase.openGui(new FetchConfigGui());
 		});
+		then(200, () -> mc.setScreen(null));
+		then(0, () -> jp.shulkerfetch.client.config.FetchConfigs.WHEEL_CLICK.setBooleanValue(false));
+		then(30, () -> lookAt(mc, 4, 3));
+		then(30, () -> wheel(mc));
+		// 13: back on
+		narrate(13);
+		then(0, () -> jp.shulkerfetch.client.config.FetchConfigs.WHEEL_CLICK.setBooleanValue(true));
+		then(30, () -> wheel(mc));
+		// 14: safety, 15: install
 		narrate(14);
-		then(0, () -> mc.setScreen(null));
-		card("導入", "クライアント: Litematica 0.14.x + MaLiLib 0.15.x + Fabric API + 本 Mod", "サーバー: Fabric API + 本 Mod(シングルプレイはクライアントのみ)", "サーバーに未導入だと取得は動きません");
 		narrate(15);
-		card("仕様", "取り出しはサーバーが検証して実行(複製・消失なし)", "探索対象: インベントリ36枠内のシュルカーボックス", "手持ちの枠に必ず入る / 元のアイテムは空きスロットへ退避", "空きスロットが無いときは何もせず終了");
 		steps.add(new Step(0, () -> { }, () -> System.currentTimeMillis() >= narrFreeAt));
 		then(40, () -> {
 			System.out.println("DEMOMARK end " + System.currentTimeMillis());

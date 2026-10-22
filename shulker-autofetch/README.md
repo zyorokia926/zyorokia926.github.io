@@ -98,7 +98,7 @@ Mixin(`shulkerfetch.mixins.json`、`defaultRequire: 1` で適用失敗は起動�
 | 同期の一致 | 最終状態のサーバー側ダンプとクライアント側ダンプが完全一致(全スロットとシュルカー内訳) |
 | 重複・ループ | 既に所持→要求0件。存在しないアイテムの連続呼び出し→スキャン1回のみ。呼び出し元不明→無視。3シナリオで要求ちょうど3件 |
 
-| 設計図(実物の Litematica 配置)を使ったデモ収録 | 設計図ブロックを視線で指し、Litematica 本来のルーチン(`doSchematicWorldPickBlock(true)` = 中ボタン既定の経路、`handleEasyPlace`)を呼んで、ホイールクリックの取得、Easy Place での石・ガラス・木材・ハーフブロック(Slabs only)の取得と **実際のブロック設置**、レンガ取得、満杯時の無動作、存在しない場合の無動作、設定画面を確認(`video/shulker-autofetch-demo.mp4`) |
+| 設計図(実物の Litematica 配置)を使ったデモ収録 | 設計図ブロックを視線で指し、Litematica 本来のルーチン(`doSchematicWorldPickBlock(true)` = 中ボタン既定の経路、`handleEasyPlace`)を呼んで、ホイールクリックの取得、Easy Place での石・ガラス・木材・ハーフブロック(Slabs only)の取得と **実際のブロック設置**、レンガ取得、満杯時の無動作、存在しない場合の無動作、設定画面を確認(`video/shulker-autofetch-feature-explained.mp4`) |
 
 **未検証(実施できていません)**
 

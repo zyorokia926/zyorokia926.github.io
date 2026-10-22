@@ -39,6 +39,16 @@ public class DemoServer implements ModInitializer {
 		});
 	}
 
+	private static void giveInventory(ServerPlayerEntity p) {
+		var inv = p.getInventory();
+		inv.clear();
+		inv.main.set(9, box(Items.BLUE_SHULKER_BOX, new ItemStack(Items.STONE, 64), new ItemStack(Items.STONE, 30), new ItemStack(Items.GLASS, 16)));
+		inv.main.set(10, box(Items.RED_SHULKER_BOX, new ItemStack(Items.OAK_PLANKS, 32), new ItemStack(Items.OAK_SLAB, 16), new ItemStack(Items.BRICKS, 20), new ItemStack(Items.SAND, 20)));
+		inv.main.set(4, new ItemStack(Items.STICK, 5));
+		inv.selectedSlot = 4;
+		p.networkHandler.sendPacket(new UpdateSelectedSlotS2CPacket(4));
+	}
+
 	private static void run(int step, ServerPlayerEntity p) {
 		var inv = p.getInventory();
 		switch (step) {
@@ -56,13 +66,16 @@ public class DemoServer implements ModInitializer {
 						}
 					}
 				}
-				inv.clear();
-				inv.main.set(9, box(Items.BLUE_SHULKER_BOX, new ItemStack(Items.STONE, 64), new ItemStack(Items.STONE, 30), new ItemStack(Items.GLASS, 16)));
-				inv.main.set(10, box(Items.RED_SHULKER_BOX, new ItemStack(Items.OAK_PLANKS, 32), new ItemStack(Items.OAK_SLAB, 16), new ItemStack(Items.BRICKS, 20)));
-				inv.main.set(4, new ItemStack(Items.STICK, 5));
-				inv.selectedSlot = 4;
-				p.networkHandler.sendPacket(new UpdateSelectedSlotS2CPacket(4));
+				giveInventory(p);
 				p.networkHandler.requestTeleport(0.5, -60.0, -0.5, 0f, 0f);
+				p.playerScreenHandler.sendContentUpdates();
+			}
+			case 3 -> {
+				inv.main.set(20, new ItemStack(Items.GLASS, 5));
+				p.playerScreenHandler.sendContentUpdates();
+			}
+			case 4 -> {
+				giveInventory(p);
 				p.playerScreenHandler.sendContentUpdates();
 			}
 			case 1 -> {

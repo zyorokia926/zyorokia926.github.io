@@ -65,7 +65,7 @@ Litematica の **ホイールクリック(Pick Block)** と **Easy Place**(精�
 **実施済み**: クリーンビルド、ユニットテスト17件、専用サーバー起動、実クライアント(Litematica/MaLiLib 実物, xvfb)+専用サーバーでの
 Mixin 適用(エラー0)・先行適用(同tickで手持ち枠に入る)→要求→サーバー検証→同期、同一tickの2要求でサーバー拒否→巻き戻し→最終状態一致、サーバー/クライアント内容の一致、重複・ループなし。
 
-**追加で実施済み**: 実物の Litematica 配置(設計図)に対し、Litematica 本来のルーチン(中ボタン既定経路 `doSchematicWorldPickBlock(true)`、`handleEasyPlace`)で、ホイールクリック取得・Easy Place 取得と実ブロック設置・Slabs only・満杯時通知・存在しない場合の無動作・設定画面を収録確認(video/shulker-autofetch-demo.mp4)。
+**追加で実施済み**: 実物の Litematica 配置(設計図)に対し、Litematica 本来のルーチン(中ボタン既定経路 `doSchematicWorldPickBlock(true)`、`handleEasyPlace`)で、ホイールクリック取得・Easy Place 取得と実ブロック設置・Slabs only・満杯時通知・存在しない場合の無動作・設定画面を収録確認(video/shulker-autofetch-feature-explained.mp4)。
 
 **未検証**: 物理的なマウス/キーボード入力イベント(中ボタン・使用キーの実押下)、満杯・別画面・クールダウンの実機確認、
 Mod未導入サーバー/版数不一致の実機確認、複数人同時接続、他 Mod との併用、通常の Fabric ランチャー(intermediary)での起動。
