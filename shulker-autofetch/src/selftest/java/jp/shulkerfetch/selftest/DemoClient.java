@@ -73,6 +73,9 @@ public class DemoClient implements ClientModInitializer {
 	}
 
 	private void card(String... lines) {
+		if (Boolean.getBoolean("shulkerfetch.nocaption")) {
+			return;
+		}
 		then(0, () -> card = lines);
 	}
 
@@ -170,16 +173,13 @@ public class DemoClient implements ClientModInitializer {
 		} catch (java.io.IOException e) {
 			throw new IllegalStateException(e);
 		}
-		card("Shulker AutoFetch", "Litematica 用:シュルカーボックスから自動でアイテム取得", "Minecraft 1.19.4 / Fabric");
-		narrate(0);
-		steps.add(new Step(0, () -> { }, () -> System.currentTimeMillis() >= narrFreeAt));
-		card("対応する操作", "・設計図ブロックへのホイールクリック (Pick Block)", "・Easy Place", "・Easy Place の精密設置プロトコル (ProPlace)");
-		narrate(1);
-		steps.add(new Step(0, () -> { }, () -> System.currentTimeMillis() >= narrFreeAt));
-		noCard();
 		then(0, () -> send(0));
 		then(60, () -> buildSchematic(mc));
-		then(100, () -> { });
+		then(100, () -> System.out.println("DEMOMARK vstart " + System.currentTimeMillis()));
+		narrate(0);
+		steps.add(new Step(0, () -> { }, () -> System.currentTimeMillis() >= narrFreeAt));
+		narrate(1);
+		steps.add(new Step(0, () -> { }, () -> System.currentTimeMillis() >= narrFreeAt));
 		narrate(2);
 		narrate(3);
 		then(30, () -> mc.setScreen(new InventoryScreen(mc.player)));
