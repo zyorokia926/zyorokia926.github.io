@@ -1,0 +1,12 @@
+{
+	"shulkerfetch.gui.title": "Shulker AutoFetch",
+	"shulkerfetch.hotkeys.category": "Shulker AutoFetch",
+	"shulkerfetch.msg.not_found": "Shulker AutoFetch: シュルカーボックス内に該当アイテムがありません",
+	"shulkerfetch.msg.inventory_full": "Shulker AutoFetch: インベントリに空きがありません",
+	"shulkerfetch.msg.busy": "Shulker AutoFetch: サーバーが処理中です。もう一度お試しください",
+	"shulkerfetch.msg.server_disabled": "Shulker AutoFetch: このサーバーでは無効です",
+	"shulkerfetch.msg.version_mismatch": "Shulker AutoFetch: クライアントとサーバーのModバージョンが一致しません",
+	"shulkerfetch.msg.no_server": "Shulker AutoFetch: サーバーにこのModが導入されていません",
+	"shulkerfetch.msg.timeout": "Shulker AutoFetch: サーバーから応答がありません",
+	"shulkerfetch.msg.failed": "Shulker AutoFetch: アイテムを取り出せませんでした"
+}

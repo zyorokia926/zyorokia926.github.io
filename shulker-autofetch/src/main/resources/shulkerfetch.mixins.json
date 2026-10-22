@@ -1,0 +1,13 @@
+{
+	"required": true,
+	"package": "jp.shulkerfetch.client.mixin",
+	"compatibilityLevel": "JAVA_17",
+	"minVersion": "0.8",
+	"client": [
+		"MixinInventoryUtils",
+		"MixinWorldUtils"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

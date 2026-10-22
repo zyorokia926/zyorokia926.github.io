@@ -1,0 +1,74 @@
+plugins {
+	id 'fabric-loom' version '1.11.8'
+}
+
+version = project.mod_version
+group = project.maven_group
+base.archivesName = project.archives_base_name
+
+repositories {
+	exclusiveContent {
+		forRepository { maven { url = 'https://api.modrinth.com/maven' } }
+		filter { includeGroup 'maven.modrinth' }
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
+	// Litematica / MaLiLib are client-only and hard dependencies of the client half.
+	modCompileOnly "maven.modrinth:litematica:${project.litematica_version_id}"
+	modCompileOnly "maven.modrinth:malilib:${project.malilib_version_id}"
+	modLocalRuntime "maven.modrinth:malilib:${project.malilib_version_id}"
+	modLocalRuntime "maven.modrinth:litematica:${project.litematica_version_id}"
+
+	testImplementation "net.fabricmc:fabric-loader-junit:${project.loader_version}"
+	testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
+}
+
+test {
+	useJUnitPlatform()
+}
+
+sourceSets {
+	selftest {
+		compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+		runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+	}
+}
+
+loom {
+	mods {
+		shulkerfetch { sourceSet sourceSets.main }
+		shulkerfetch_selftest { sourceSet sourceSets.selftest }
+	}
+	runs {
+		server {
+			source sourceSets.selftest
+		}
+		client {
+			source sourceSets.selftest
+			programArgs '--server', 'localhost', '--port', '25599', '--username', 'TestBot'
+		}
+	}
+}
+
+processResources {
+	inputs.property 'version', project.version
+	filesMatching('fabric.mod.json') { expand 'version': project.version }
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.encoding = 'UTF-8'
+	it.options.release = 17
+}
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_17
+	targetCompatibility = JavaVersion.VERSION_17
+	withSourcesJar()
+}

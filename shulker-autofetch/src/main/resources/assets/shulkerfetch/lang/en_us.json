@@ -1,0 +1,12 @@
+{
+	"shulkerfetch.gui.title": "Shulker AutoFetch",
+	"shulkerfetch.hotkeys.category": "Shulker AutoFetch",
+	"shulkerfetch.msg.not_found": "Shulker AutoFetch: item not found in any shulker box",
+	"shulkerfetch.msg.inventory_full": "Shulker AutoFetch: no free inventory slot",
+	"shulkerfetch.msg.busy": "Shulker AutoFetch: server is busy, try again",
+	"shulkerfetch.msg.server_disabled": "Shulker AutoFetch: disabled on this server",
+	"shulkerfetch.msg.version_mismatch": "Shulker AutoFetch: client/server mod versions differ",
+	"shulkerfetch.msg.no_server": "Shulker AutoFetch: the server does not have this mod installed",
+	"shulkerfetch.msg.timeout": "Shulker AutoFetch: the server did not answer",
+	"shulkerfetch.msg.failed": "Shulker AutoFetch: could not take the item"
+}

@@ -1,0 +1,12 @@
+{
+	"schemaVersion": 1,
+	"id": "shulkerfetch_selftest",
+	"version": "1.0.0",
+	"name": "Shulker AutoFetch self test (dev only, not shipped)",
+	"environment": "*",
+	"entrypoints": {
+		"main": ["jp.shulkerfetch.selftest.SelfTestServer"],
+		"client": ["jp.shulkerfetch.selftest.SelfTestClient"]
+	},
+	"depends": { "shulkerfetch": "*" }
+}

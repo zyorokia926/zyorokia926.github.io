@@ -1,0 +1,27 @@
+{
+	"schemaVersion": 1,
+	"id": "shulkerfetch",
+	"version": "${version}",
+	"name": "Shulker AutoFetch",
+	"description": "Litematica addon: takes items needed by Easy Place / pick block out of shulker boxes in your inventory. Install on the client AND the server.",
+	"authors": ["shulkerfetch"],
+	"license": "LGPL-3.0-or-later",
+	"environment": "*",
+	"entrypoints": {
+		"main": ["jp.shulkerfetch.common.ShulkerFetchMod"],
+		"client": ["jp.shulkerfetch.client.ShulkerFetchClient"]
+	},
+	"mixins": [
+		{ "config": "shulkerfetch.mixins.json", "environment": "client" }
+	],
+	"depends": {
+		"fabricloader": ">=0.15.0",
+		"minecraft": "1.19.4",
+		"java": ">=17",
+		"fabric-api": ">=0.87.2"
+	},
+	"recommends": {
+		"litematica": ">=0.14.2 <0.15.0",
+		"malilib": ">=0.15.3 <0.16.0"
+	}
+}
