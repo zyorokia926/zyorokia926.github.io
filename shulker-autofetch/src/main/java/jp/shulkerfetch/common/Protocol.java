@@ -6,7 +6,7 @@ import net.minecraft.util.Identifier;
 public final class Protocol {
 	public static final String MOD_ID = "shulkerfetch";
 	/** Bumped whenever the packet layout changes. Client and server must match exactly. */
-	public static final int VERSION = 1;
+	public static final int VERSION = 2;
 
 	/** S2C: sent once on join. Tells the client that the server half is installed. */
 	public static final Identifier HELLO = new Identifier(MOD_ID, "hello");

@@ -52,10 +52,12 @@ public final class ServerFetchHandler {
 		// Read everything now: the buffer must not be touched after this method returns.
 		int protocol;
 		int requestId;
+		int selectedSlot;
 		ItemStack requested;
 		try {
 			protocol = buf.readVarInt();
 			requestId = buf.readVarInt();
+			selectedSlot = buf.readVarInt();
 			requested = buf.readItemStack();
 			if (buf.isReadable()) {
 				requested = ItemStack.EMPTY; // trailing garbage: treat as malformed
@@ -64,11 +66,15 @@ public final class ServerFetchHandler {
 			return; // undecodable, nobody to answer
 		}
 		ItemStack target = requested;
-		server.execute(() -> reply(player, requestId, protocol, target));
+		server.execute(() -> reply(player, requestId, protocol, selectedSlot, target));
 	}
 
-	private void reply(ServerPlayerEntity player, int requestId, int protocol, ItemStack target) {
-		Result result = process(player, protocol, target);
+	private void reply(ServerPlayerEntity player, int requestId, int protocol, int selectedSlot, ItemStack target) {
+		Result result = process(player, protocol, selectedSlot, target);
+		if (result.status() != Status.OK) {
+			// The client applies the same change optimistically; on any refusal resend the authoritative state.
+			player.playerScreenHandler.syncState();
+		}
 		PacketByteBuf out = PacketByteBufs.create();
 		out.writeVarInt(requestId);
 		out.writeVarInt(result.status().ordinal());
@@ -78,7 +84,7 @@ public final class ServerFetchHandler {
 	}
 
 	/** Performs the whole transaction on the server thread. Public for tests. */
-	public Result process(ServerPlayerEntity player, int protocol, ItemStack requested) {
+	public Result process(ServerPlayerEntity player, int protocol, int selectedSlot, ItemStack requested) {
 		if (!config.enabled) {
 			return Result.of(Status.DISABLED);
 		}
@@ -100,6 +106,9 @@ public final class ServerFetchHandler {
 		lastAccepted.put(player.getUuid(), now);
 
 		PlayerInventory inv = player.getInventory();
+		if (selectedSlot != inv.selectedSlot) {
+			return Result.of(Status.BAD_REQUEST); // client and server disagree about the held slot
+		}
 		Result result = FetchTransaction.run(inv, requested, inv.selectedSlot);
 		if (result.status() == Status.OK) {
 			inv.markDirty();

@@ -50,6 +50,8 @@ public class SelfTestClient implements ClientModInitializer {
 		} finally {
 			FetchController.source = Source.NONE;
 		}
+		// Same tick, right after the call: the item must already be in the held slot.
+		System.out.println("SELFTEST-IMMEDIATE " + item + " -> hand=" + mc.player.getMainHandStack());
 	}
 
 	private static void report(MinecraftClient mc, String label) {
@@ -89,7 +91,13 @@ public class SelfTestClient implements ClientModInitializer {
 				case 230 -> report(mc, "after E (source NONE, must not fetch)");
 				case 240 -> pick(mc, Items.OAK_PLANKS, Source.WHEEL_CLICK);
 				case 260 -> report(mc, "after F (planks)");
-				case 320 -> {
+				case 262 -> {
+					pick(mc, Items.SAND, Source.WHEEL_CLICK);   // G: two different fetches in one tick;
+					pick(mc, Items.BRICKS, Source.WHEEL_CLICK); // the server refuses the 2nd (cooldown) and resyncs
+				}
+				case 285 -> report(mc, "after G (sand then bricks in the same tick; server decides)");
+				case 345 -> report(mc, "FINAL");
+				case 380 -> {
 					System.out.println("SELFTEST: done");
 					mc.scheduleStop();
 				}

@@ -1,10 +1,10 @@
 package jp.shulkerfetch.client;
 
 import fi.dy.masa.litematica.util.EasyPlaceProtocol;
-import fi.dy.masa.litematica.util.InventoryUtils;
 import fi.dy.masa.litematica.util.PlacementHandler;
-import fi.dy.masa.litematica.world.SchematicWorldHandler;
+import java.util.ArrayDeque;
 import jp.shulkerfetch.client.config.FetchConfigs;
+import jp.shulkerfetch.common.FetchTransaction;
 import jp.shulkerfetch.common.Protocol;
 import jp.shulkerfetch.common.Protocol.Status;
 import jp.shulkerfetch.common.ShulkerInventory;
@@ -14,37 +14,39 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.PacketByteBuf;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Client half of the fetch. Litematica's pick-block routine calls {@link #onPick}; if the needed item is
- * not in the inventory but inside a shulker box, a request is sent to the server and the original pick is
- * replayed once the server has confirmed the transfer. All state lives on the client thread.
+ * Client half of the fetch, called at the start of Litematica's pick-block routine.
+ * <p>
+ * If the item is already in the inventory nothing happens and Litematica behaves exactly as before.
+ * Only when it is missing and a shulker box holds it, the very same transfer the server will perform is applied
+ * to the local inventory <em>immediately</em> (so the item is in the held slot when the original routine continues
+ * in the same tick) and a request is sent. The server re-checks everything and is authoritative: it syncs the
+ * real inventory after every request and resends the whole state if it refuses, which corrects the local guess.
  */
 public final class FetchController {
 	private static final Logger LOGGER = LoggerFactory.getLogger("shulkerfetch");
-	/** How long to wait for the server before giving up. */
-	private static final int TIMEOUT_TICKS = 60;
-	/** After a failure the same item is not requested/scanned again for this long. */
+	/** Requests that have not been answered yet; further fetches wait until there is room. */
+	private static final int MAX_IN_FLIGHT = 4;
+	private static final int TIMEOUT_TICKS = 100;
+	/** After a failed lookup the same item is not scanned/requested again for this long. */
 	private static final int RETRY_COOLDOWN_TICKS = 40;
 
 	public enum Source {
 		NONE, WHEEL_CLICK, EASY_PLACE
 	}
 
-	private record Pending(int id, ItemStack stack, BlockPos pos, int startTick) {
+	private record Pending(int id, int startTick, ItemStack stack) {
 	}
 
 	/** Set by the Litematica entry-point mixins for the duration of one call; cleared every tick as well. */
 	public static Source source = Source.NONE;
 
+	private static final ArrayDeque<Pending> PENDING = new ArrayDeque<>();
 	private static int tick;
 	private static int nextId = 1;
-	private static Pending pending;
-	private static boolean replaying;
 	private static boolean serverReady;
 	private static boolean warnedServer;
 	private static ItemStack blockedStack = ItemStack.EMPTY;
@@ -53,50 +55,44 @@ public final class FetchController {
 	private FetchController() {
 	}
 
-	/** @return true if the original Litematica pick must be skipped for now (a fetch is under way). */
-	public static boolean onPick(ItemStack stack, BlockPos pos, World schematicWorld, MinecraftClient mc) {
-		if (replaying || stack.isEmpty() || mc.player == null || !isSourceEnabled(mc)) {
-			return false;
+	public static void beforePick(ItemStack stack, MinecraftClient mc) {
+		if (stack.isEmpty() || mc.player == null || mc.currentScreen != null || !isSourceEnabled(mc)) {
+			return;
 		}
 		PlayerInventory inv = mc.player.getInventory();
-		stack = stack.copy();
-		stack.setCount(1);
-		if (ShulkerInventory.isAvailableInInventory(inv, stack)) {
-			return false; // nothing to fetch: Litematica behaves exactly as before
+		ItemStack wanted = stack.copy();
+		wanted.setCount(1);
+		if (ShulkerInventory.isAvailableInInventory(inv, wanted)) {
+			return; // the inventory comes first: Litematica handles it as usual
 		}
-		if (pending != null) {
-			return true; // one request at a time; also swallows repeated easy-place ticks
-		}
-		if (isBlocked(stack)) {
-			return false;
-		}
-		if (ShulkerInventory.find(inv, stack) == null) {
-			debug("{} is in no shulker box", stack);
-			block(stack);
-			return false; // let Litematica do what it would do without this mod
-		}
-		if (!inv.getMainHandStack().isEmpty() && ShulkerInventory.findEmptySlot(inv) < 0) {
-			block(stack);
-			debug("no free slot to swap the held stack into");
-			return false;
+		if (isBlocked(wanted) || PENDING.size() >= MAX_IN_FLIGHT) {
+			return;
 		}
 		if (!serverReady || !ClientPlayNetworking.canSend(Protocol.REQUEST)) {
 			if (!warnedServer) {
 				warnedServer = true;
-				LOGGER.warn("[shulkerfetch] the server does not have Shulker AutoFetch installed; fetching from shulker boxes is off");
+				LOGGER.warn("[shulkerfetch] the server does not have Shulker AutoFetch installed (or its version differs); fetching from shulker boxes is off");
 			}
-			block(stack);
-			return false;
+			block(wanted);
+			return;
+		}
+		int selected = inv.selectedSlot;
+		// Same code the server runs; changes the local inventory only if the transfer is possible.
+		FetchTransaction.Result result = FetchTransaction.run(inv, wanted, selected);
+		if (result.status() != Status.OK) {
+			debug("{}: {}", wanted, result.status());
+			block(wanted);
+			return;
 		}
 		int id = nextId++;
 		PacketByteBuf buf = PacketByteBufs.create();
 		buf.writeVarInt(Protocol.VERSION);
 		buf.writeVarInt(id);
-		buf.writeItemStack(stack);
+		buf.writeVarInt(selected);
+		buf.writeItemStack(wanted);
 		ClientPlayNetworking.send(Protocol.REQUEST, buf);
-		pending = new Pending(id, stack, pos.toImmutable(), tick);
-		debug("request #{} for {} sent", id, stack);
-		return true;
+		PENDING.add(new Pending(id, tick, wanted));
+		debug("took {}x {} into slot {} (request #{})", result.amount(), wanted, result.slot(), id);
 	}
 
 	private static boolean isSourceEnabled(MinecraftClient mc) {
@@ -117,40 +113,34 @@ public final class FetchController {
 		}
 	}
 
-	/** Called on the client thread when the server answers a request. */
-	public static void onResponse(MinecraftClient mc, int id, Status status, int amount, int slot) {
-		Pending p = pending;
-		if (p == null || p.id() != id) {
+	/** Called on the client thread when the server answers a request (its inventory sync arrived just before). */
+	public static void onResponse(int id, Status status, int amount, int slot) {
+		Pending found = null;
+		for (Pending p : PENDING) {
+			if (p.id() == id) {
+				found = p;
+				break;
+			}
+		}
+		if (found == null) {
 			debug("ignoring stale response #{}", id);
 			return;
 		}
-		pending = null;
+		PENDING.remove(found);
 		debug("response #{}: {} amount={} slot={}", id, status, amount, slot);
-		if (status != Status.OK && status != Status.ALREADY_AVAILABLE) {
-			block(p.stack());
-			return;
-		}
-		World schematic = SchematicWorldHandler.getSchematicWorld();
-		if (mc.player == null || schematic == null) {
-			return;
-		}
-		// The server has already synced the inventory (those packets arrived before this one), so the
-		// original routine now finds the item and completes normally. No new request can start meanwhile.
-		replaying = true;
-		try {
-			InventoryUtils.schematicWorldPickBlock(p.stack(), p.pos(), schematic, mc);
-		} finally {
-			replaying = false;
+		if (status != Status.OK) {
+			// The server has already resent the real inventory, replacing our guess.
+			block(found.stack());
 		}
 	}
 
-	public static void onTick(MinecraftClient mc) {
+	public static void onTick() {
 		tick++;
 		source = Source.NONE;
-		if (pending != null && tick - pending.startTick() > TIMEOUT_TICKS) {
-			debug("request #{} timed out", pending.id());
-			block(pending.stack());
-			pending = null;
+		while (!PENDING.isEmpty() && tick - PENDING.peekFirst().startTick() > TIMEOUT_TICKS) {
+			Pending timedOut = PENDING.pollFirst();
+			debug("request #{} timed out", timedOut.id());
+			block(timedOut.stack());
 		}
 	}
 
@@ -158,12 +148,12 @@ public final class FetchController {
 		serverReady = serverVersion == Protocol.VERSION;
 		warnedServer = false;
 		if (!serverReady) {
-			LOGGER.warn("Server has protocol {}, this client needs {}; shulker fetching disabled", serverVersion, Protocol.VERSION);
+			LOGGER.warn("[shulkerfetch] server protocol {} differs from this client's {}; shulker fetching disabled", serverVersion, Protocol.VERSION);
 		}
 	}
 
 	public static void reset() {
-		pending = null;
+		PENDING.clear();
 		serverReady = false;
 		warnedServer = false;
 		blockedStack = ItemStack.EMPTY;

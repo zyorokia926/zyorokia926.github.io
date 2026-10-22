@@ -7,6 +7,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
+import net.minecraft.registry.Registries;
 
 /**
  * Reads and edits the contents of shulker box item stacks.
@@ -51,14 +52,16 @@ public final class ShulkerInventory {
 	}
 
 	/**
-	 * Finds the entry to take from. Among all shulker boxes in the main inventory the smallest
-	 * matching entry wins (it empties partial stacks first); ties go to the lowest inventory slot.
+	 * Finds the entry to take from. Among all shulker boxes in the main inventory the largest
+	 * matching entry wins (so a full stack is taken whenever one exists); ties go to the lowest
+	 * inventory slot. Entries are first compared by their raw item id so that only candidates are parsed.
 	 */
 	public static Match find(PlayerInventory inv, ItemStack target) {
 		if (target.isEmpty()) {
 			return null;
 		}
 		Match best = null;
+		String id = Registries.ITEM.getId(target.getItem()).toString();
 		for (int slot = 0; slot < inv.main.size(); slot++) {
 			ItemStack box = inv.main.get(slot);
 			if (!isShulkerBox(box)) {
@@ -70,11 +73,14 @@ public final class ShulkerInventory {
 			}
 			for (int i = 0; i < list.size(); i++) {
 				NbtCompound entry = list.getCompound(i);
+				if (!id.equals(entry.getString("id"))) {
+					continue;
+				}
 				ItemStack content = ItemStack.fromNbt(entry);
 				if (content.isEmpty() || !ItemStack.canCombine(target, content)) {
 					continue;
 				}
-				if (best == null || content.getCount() < best.count()) {
+				if (best == null || content.getCount() > best.count()) {
 					best = new Match(slot, i, content.getCount());
 				}
 			}

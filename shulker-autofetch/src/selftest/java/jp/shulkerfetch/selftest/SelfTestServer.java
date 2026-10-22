@@ -38,12 +38,13 @@ public class SelfTestServer implements ModInitializer {
 			p.getInventory().clear();
 			p.getInventory().main.set(0, box(Items.BLUE_SHULKER_BOX, 0, new ItemStack(Items.STONE, 64), 1, new ItemStack(Items.STONE, 17), 2, new ItemStack(Items.GLASS, 10)));
 			p.getInventory().main.set(1, box(Items.RED_SHULKER_BOX, 0, new ItemStack(Items.OAK_PLANKS, 5)));
+			p.getInventory().main.set(2, box(Items.LIME_SHULKER_BOX, 0, new ItemStack(Items.SAND, 20), 1, new ItemStack(Items.BRICKS, 30)));
 			p.playerScreenHandler.sendContentUpdates();
 			player = p;
 			joinTick = server.getTicks();
 		});
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
-			if (player != null && server.getTicks() - joinTick == 300) {
+			if (player != null && server.getTicks() - joinTick == 420) {
 				System.out.println("SELFTEST-SERVER: " + SelfTestClient.dump(player.getInventory()));
 			}
 		});

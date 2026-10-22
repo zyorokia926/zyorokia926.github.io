@@ -31,10 +31,10 @@ public class ShulkerFetchClient implements ClientModInitializer {
 			Status status = Status.byId(buf.readVarInt());
 			int amount = buf.readVarInt();
 			int slot = buf.readVarInt();
-			client.execute(() -> FetchController.onResponse(client, id, status, amount, slot));
+			client.execute(() -> FetchController.onResponse(id, status, amount, slot));
 		});
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> FetchController.reset());
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> FetchController.reset());
-		ClientTickEvents.END_CLIENT_TICK.register((MinecraftClient client) -> FetchController.onTick(client));
+		ClientTickEvents.END_CLIENT_TICK.register((MinecraftClient client) -> FetchController.onTick());
 	}
 }

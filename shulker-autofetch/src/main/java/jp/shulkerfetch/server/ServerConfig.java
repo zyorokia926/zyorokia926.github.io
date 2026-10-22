@@ -19,7 +19,7 @@ public final class ServerConfig {
 	/** Master switch: when false the server answers every request with DISABLED. */
 	public boolean enabled = true;
 	/** Minimum ticks between two accepted requests of the same player. */
-	public int cooldownTicks = 5;
+	public int cooldownTicks = 2;
 
 	public static ServerConfig load() {
 		Path path = FabricLoader.getInstance().getConfigDir().resolve("shulkerfetch-server.json");

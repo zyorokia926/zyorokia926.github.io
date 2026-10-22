@@ -97,9 +97,30 @@ class FetchTransactionTest {
 		inv.main.set(2, box(stack(Items.SHULKER_BOX, 1), 0, stack(Items.SAND, 3)));
 		Result r = FetchTransaction.run(inv, stack(Items.SAND, 1), 0);
 		assertEquals(Status.OK, r.status());
-		assertEquals(3, r.amount(), "the smaller matching entry is used first");
-		assertEquals(20, total(inv, Items.SAND) - 3 );
+		assertEquals(20, r.amount(), "the largest matching entry is used");
+		assertEquals(23, total(inv, Items.SAND));
 		assertEquals(10, total(inv, Items.GLASS));
+	}
+
+	@Test
+	void takesFromTheLargestEntryEvenWithinOneBox() {
+		PlayerInventory inv = inv();
+		inv.main.set(9, box(stack(Items.SHULKER_BOX, 1), 0, stack(Items.STONE, 10), 1, stack(Items.STONE, 40), 2, stack(Items.STONE, 25)));
+		Result r = FetchTransaction.run(inv, stack(Items.STONE, 1), 0);
+		assertEquals(40, r.amount());
+		assertEquals(35, total(inv, Items.STONE) - 40);
+	}
+
+	@Test
+	void largestEntryAcrossBoxesTiesGoToTheLowerSlot() {
+		PlayerInventory inv = inv();
+		inv.main.set(12, box(stack(Items.SHULKER_BOX, 1), 0, stack(Items.STONE, 64)));
+		inv.main.set(11, box(stack(Items.RED_SHULKER_BOX, 1), 0, stack(Items.STONE, 64), 1, stack(Items.DIRT, 1)));
+		inv.main.set(30, box(stack(Items.BLUE_SHULKER_BOX, 1), 0, stack(Items.STONE, 5)));
+		Result r = FetchTransaction.run(inv, stack(Items.STONE, 1), 0);
+		assertEquals(64, r.amount());
+		assertEquals(1, total(inv, Items.DIRT), "the lower-slot box (11) was used and keeps its dirt");
+		assertEquals(0, inv.main.get(12).getSubNbt("BlockEntityTag") == null ? 1 : 0, "the higher-slot box was untouched");
 	}
 
 	@Test
