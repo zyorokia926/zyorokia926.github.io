@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>素材管理</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #fff; --text: #1d2330; --muted: #6b7385;
+    --line: #dfe3ea; --accent: #3b6df0; --ok: #1f9d55; --danger: #d64545;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b; --panel: #1b2029; --text: #e6e9f0; --muted: #98a1b3;
+      --line: #2b3240; --accent: #6b93ff; --ok: #4cc38a; --danger: #ff7a7a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 8px 0 12px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+  .add { display: grid; grid-template-columns: 1fr 1fr 80px 80px auto; gap: 8px; }
+  input, select, button { font: inherit; color: inherit; background: var(--bg);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px; min-width: 0; }
+  button { cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger { color: var(--danger); }
+  .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin-top: 6px; }
+  .bar > div { height: 100%; background: var(--ok); width: 0; transition: width .2s; }
+  .tools { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tools input[type=search] { flex: 1; min-width: 140px; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; align-items: center;
+    padding: 10px 4px; border-top: 1px solid var(--line); }
+  li:first-child { border-top: 0; }
+  li.done .name { text-decoration: line-through; color: var(--muted); }
+  .name { font-weight: 600; }
+  .cat { font-size: 12px; color: var(--muted); }
+  .qty { display: flex; align-items: center; gap: 4px; }
+  .qty button { width: 30px; padding: 4px 0; }
+  .qty span { min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; }
+  .empty { color: var(--muted); text-align: center; padding: 20px 0; }
+  .foot { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  @media (max-width: 560px) {
+    .add { grid-template-columns: 1fr 1fr; }
+    li { grid-template-columns: auto 1fr auto; }
+    li .del { grid-column: 3; grid-row: 1; }
+    li .qty { grid-column: 2 / 4; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>素材管理</h1>
+
+  <form class="panel add" id="form">
+    <input id="name" placeholder="素材名" required>
+    <input id="cat" placeholder="カテゴリ" list="cats">
+    <input id="have" type="number" min="0" value="0" title="所持数" aria-label="所持数">
+    <input id="need" type="number" min="1" value="1" title="必要数" aria-label="必要数">
+    <button class="primary">追加</button>
+    <datalist id="cats"></datalist>
+  </form>
+
+  <div class="panel">
+    <div id="summary">0 / 0 個 集まった</div>
+    <div class="bar"><div id="progress"></div></div>
+  </div>
+
+  <div class="panel tools">
+    <input type="search" id="q" placeholder="検索">
+    <select id="catFilter"><option value="">すべてのカテゴリ</option></select>
+    <select id="stateFilter">
+      <option value="">すべて</option>
+      <option value="todo">未達成</option>
+      <option value="done">達成済み</option>
+    </select>
+  </div>
+
+  <div class="panel"><ul id="list"></ul></div>
+
+  <div class="foot">
+    <button id="export">書き出し</button>
+    <button id="import">読み込み</button>
+    <button id="clear" class="danger">達成済みを削除</button>
+    <input type="file" id="file" accept="application/json" hidden>
+  </div>
+</main>
+
+<script>
+const KEY = "matlist-tracker-v1";
+const $ = id => document.getElementById(id);
+let items = [];
+
+try { items = JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { items = []; }
+
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(items)); } catch (e) {}
+}
+
+const isDone = it => it.have >= it.need;
+
+function render() {
+  const q = $("q").value.trim().toLowerCase();
+  const cf = $("catFilter").value;
+  const sf = $("stateFilter").value;
+
+  const cats = [...new Set(items.map(i => i.cat).filter(Boolean))].sort();
+  $("cats").innerHTML = cats.map(c => `<option value="${esc(c)}">`).join("");
+  $("catFilter").innerHTML = '<option value="">すべてのカテゴリ</option>' +
+    cats.map(c => `<option value="${esc(c)}"${c === cf ? " selected" : ""}>${esc(c)}</option>`).join("");
+
+  const shown = items.filter(i =>
+    (!q || (i.name + i.cat).toLowerCase().includes(q)) &&
+    (!cf || i.cat === cf) &&
+    (!sf || (sf === "done") === isDone(i)));
+
+  $("list").innerHTML = shown.length ? shown.map(i => `
+    <li class="${isDone(i) ? "done" : ""}" data-id="${i.id}">
+      <input type="checkbox" data-act="toggle" ${isDone(i) ? "checked" : ""} aria-label="達成">
+      <div><div class="name">${esc(i.name)}</div><div class="cat">${esc(i.cat || "未分類")}</div></div>
+      <div class="qty">
+        <button data-act="dec" aria-label="減らす">−</button>
+        <span>${i.have} / ${i.need}</span>
+        <button data-act="inc" aria-label="増やす">＋</button>
+      </div>
+      <button class="del danger" data-act="del" aria-label="削除">✕</button>
+    </li>`).join("") : '<li class="empty">素材がありません</li>';
+
+  const need = items.reduce((s, i) => s + i.need, 0);
+  const have = items.reduce((s, i) => s + Math.min(i.have, i.need), 0);
+  $("summary").textContent = `${have} / ${need} 個 集まった(${items.filter(isDone).length} / ${items.length} 種類 達成)`;
+  $("progress").style.width = need ? (have / need * 100) + "%" : "0";
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+$("form").addEventListener("submit", e => {
+  e.preventDefault();
+  items.push({
+    id: Date.now() + Math.random(),
+    name: $("name").value.trim(),
+    cat: $("cat").value.trim(),
+    have: Math.max(0, +$("have").value || 0),
+    need: Math.max(1, +$("need").value || 1),
+  });
+  $("name").value = ""; $("have").value = 0; $("need").value = 1;
+  $("name").focus();
+  save(); render();
+});
+
+$("list").addEventListener("click", e => {
+  const act = e.target.dataset.act;
+  const li = e.target.closest("li[data-id]");
+  if (!act || !li) return;
+  const it = items.find(i => String(i.id) === li.dataset.id);
+  if (!it) return;
+  if (act === "inc") it.have++;
+  if (act === "dec") it.have = Math.max(0, it.have - 1);
+  if (act === "toggle") it.have = e.target.checked ? it.need : 0;
+  if (act === "del") items = items.filter(i => i !== it);
+  save(); render();
+});
+
+["q", "catFilter", "stateFilter"].forEach(id => $(id).addEventListener("input", render));
+
+$("clear").addEventListener("click", () => {
+  const n = items.filter(isDone).length;
+  if (n && confirm(`達成済み ${n} 件を削除しますか?`)) {
+    items = items.filter(i => !isDone(i)); save(); render();
+  }
+});
+
+$("export").addEventListener("click", () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(items, null, 2)], {type: "application/json"}));
+  a.download = "matlist.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+$("import").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    if (!Array.isArray(data)) throw 0;
+    items = data.filter(i => i && i.name).map(i => ({
+      id: Date.now() + Math.random(),
+      name: String(i.name), cat: String(i.cat || ""),
+      have: Math.max(0, +i.have || 0), need: Math.max(1, +i.need || 1),
+    }));
+    save(); render();
+  } catch (err) { alert("読み込めませんでした"); }
+  e.target.value = "";
+});
+
+render();
+</script>
+</body>
+</html>
